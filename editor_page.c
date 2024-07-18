@@ -307,7 +307,47 @@ match_pattern(const gchar *pattern,
     c = gtk_text_iter_get_char(&iter);
     g_unichar_to_utf8(c, buff);
 
-   
+    if (pattern[pos] == '\n') {
+      g_print("Found new line\n");
+      if (pos == 0) {
+        g_print("  Check if starts\n");
+        if (gtk_text_iter_starts_line(&iter)) {
+          g_print("  ...It did, forward pos\n");
+          pos++;
+        }
+        g_print("  Forward char\n");
+        gtk_text_iter_forward_char(&iter);
+
+        if (pos == strlen(pattern)) {
+          /* complete match */
+          *stop_res = iter;
+          g_print("Completed match\n");
+          return true;
+        }
+
+      } else {
+        g_print("  Check if ends\n");
+        if (gtk_text_iter_ends_line(&iter)) {
+          g_print("  ...It did, forward pos\n");
+          pos++;
+          g_print("  Forward char\n");
+          gtk_text_iter_forward_char(&iter);
+
+          if (pos == strlen(pattern)) {
+            /* complete match */
+            *stop_res = iter;
+            g_print("Completed match\n");
+            return true;
+          }
+
+        } else {
+          g_print("  ...It didnt, reset pos\n");
+          pos = 0;
+        }
+      }
+      g_print("Continue after new line\n");
+      continue;
+    }
 
     if (buff[0] == pattern[pos] || pattern[pos] == '?') {
       /* Still matching so far */
