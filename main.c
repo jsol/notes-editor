@@ -12,12 +12,14 @@
 /*
 TODO
 - Scroll page list
-- fix memory leaks (hash table for pages...)
+- fix memory leaks (hash table for pages...),
 - fix g_object_unref
-- fix EditPage in multiple different tags ( 'gtk_widget_get_parent (child) ==
-NULL' failed)
-- add tags
--  add style menu
+- Fix delete page
+- Fix removing tag from page
+- Fix errors during closing of tags page
+- Clean up various marks added to buffers
+- fix header wonkyness
+- style headers better
 
 */
 

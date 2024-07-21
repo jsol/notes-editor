@@ -4,6 +4,8 @@
 #include <gtk/gtk.h>
 #include <yaml.h>
 
+#include "utils.h"
+
 G_DEFINE_TYPE(EditorPage, editor_page, G_TYPE_OBJECT)
 
 typedef enum {
@@ -264,133 +266,6 @@ insert_text(GtkTextBuffer *self,
   g_print("Inserted txt: %s\n", text);
 }
 
-static gboolean
-match_pattern(const gchar *pattern,
-              GtkTextBuffer *buffer,
-              GtkTextIter *start_bound,
-              GtkTextIter *stop_bound,
-              GtkTextIter *start_res,
-              GtkTextIter *stop_res)
-{
-  /* pattern: [?}({{< ref "?" >}} "?") */
-
-  GtkTextIter iter = { 0 };
-  GtkTextIter stop = { 0 };
-  gunichar c;
-  gchar buff[6];
-  gint pos = 0;
-
-  if (g_str_has_suffix(pattern, "?")) {
-    g_warning("Invalid pattern: %s", pattern);
-    return FALSE;
-  }
-
-  g_print("Matching pattern %s\n", pattern);
-
-  if (stop_bound == NULL) {
-    g_print("Setting offset stop \n");
-    gtk_text_buffer_get_end_iter(buffer, &stop);
-    stop_bound = &stop;
-  }
-
-  if (start_bound == NULL) {
-    gtk_text_buffer_get_start_iter(buffer, &iter);
-  } else {
-    iter = *start_bound;
-  }
-  g_print("Matching pattern2 \n");
-  while (true) {
-    if (gtk_text_iter_equal(&iter, stop_bound)) {
-      break;
-    }
-
-    c = gtk_text_iter_get_char(&iter);
-    g_unichar_to_utf8(c, buff);
-
-    if (pattern[pos] == '\n') {
-      g_print("Found new line\n");
-      if (pos == 0) {
-        g_print("  Check if starts\n");
-        if (gtk_text_iter_starts_line(&iter)) {
-          g_print("  ...It did, forward pos\n");
-          pos++;
-        }
-        g_print("  Forward char\n");
-        gtk_text_iter_forward_char(&iter);
-
-        if (pos == strlen(pattern)) {
-          /* complete match */
-          *stop_res = iter;
-          g_print("Completed match\n");
-          return true;
-        }
-
-      } else {
-        g_print("  Check if ends\n");
-        if (gtk_text_iter_ends_line(&iter)) {
-          g_print("  ...It did, forward pos\n");
-          pos++;
-          g_print("  Forward char\n");
-          gtk_text_iter_forward_char(&iter);
-
-          if (pos == strlen(pattern)) {
-            /* complete match */
-            *stop_res = iter;
-            g_print("Completed match\n");
-            return true;
-          }
-
-        } else {
-          g_print("  ...It didnt, reset pos\n");
-          pos = 0;
-        }
-      }
-      g_print("Continue after new line\n");
-      continue;
-    }
-
-    if (buff[0] == pattern[pos] || pattern[pos] == '?') {
-      /* Still matching so far */
-      if (pos == 0) {
-        g_print("First char match \n");
-        *start_res = iter;
-      }
-
-      if (pattern[pos] != '?') {
-        pos++;
-      } else {
-        /* inside wildcard match */
-        if (pattern[pos + 1] == buff[0]) {
-          /* matching next character*/
-          pos += 2;
-        }
-      }
-
-      if (pos == strlen(pattern)) {
-        /* complete match */
-        gtk_text_iter_forward_char(&iter);
-        *stop_res = iter;
-        g_print("Completed match\n");
-        return true;
-      }
-    } else {
-      if (pos > 0) {
-        gchar *str = gtk_text_iter_get_text(start_res, &iter);
-        g_print("Failed match on pos %d/%lu [%c] with str: %s at line %d\n",
-                pos, strlen(pattern), pattern[pos], str,
-                gtk_text_iter_get_line(&iter));
-        g_free(str);
-      }
-      pos = 0;
-    }
-
-    gtk_text_iter_forward_char(&iter);
-  }
-
-  g_print("No match\n");
-  return FALSE;
-}
-
 static GtkTextMark *
 fix_last_anchor(EditorPage *page, GtkTextMark *start_mark)
 {
@@ -491,10 +366,10 @@ fix_anchors(EditorPage *page)
 
   gtk_text_buffer_get_start_iter(page->content, &start_bound);
 
-  while (match_pattern("[?]({{< ref \"?\" >}} \"?\")", page->content,
-                       &start_bound, NULL, &start_res, &stop_res)) {
-    match_pattern("[?]", page->content, &start_res, &stop_res, &start_name,
-                  &stop_name);
+  while (utils_match_pattern("[?]({{< ref \"?\" >}} \"?\")", page->content,
+                             &start_bound, NULL, &start_res, &stop_res)) {
+    utils_match_pattern("[?]", page->content, &start_res, &stop_res,
+                        &start_name, &stop_name);
 
     gtk_text_iter_forward_char(&start_name);
     gtk_text_iter_backward_char(&stop_name);
@@ -546,138 +421,13 @@ fix_anchors(EditorPage *page)
 }
 
 static void
-insert_styling_tag(GtkTextBuffer *buffer,
-                   GtkTextIter *start,
-                   GtkTextIter *stop,
-                   gint before,
-                   gint after,
-                   gint del_before,
-                   gint del_after,
-                   const gchar *tag_name)
-{
-  GtkTextIter start_tag;
-  GtkTextIter stop_tag;
-  GtkTextIter start_del;
-  GtkTextIter stop_del;
-  GtkTextMark *delete_start = NULL;
-  GtkTextMark *delete_stop = NULL;
-  start_tag = *start;
-  stop_tag = *stop;
-
-  for (gint i = 0; i < before; i++) {
-    gtk_text_iter_forward_char(&start_tag);
-  }
-
-  for (gint i = 0; i < after; i++) {
-    gtk_text_iter_backward_char(&stop_tag);
-  }
-
-  gtk_text_buffer_apply_tag_by_name(buffer, tag_name, &start_tag, &stop_tag);
-
-  start_del = start_tag;
-  stop_del = stop_tag;
-  for (gint i = 0; i < del_before; i++) {
-    gtk_text_iter_backward_char(&start_del);
-  }
-
-  for (gint i = 0; i < del_after; i++) {
-    gtk_text_iter_forward_char(&stop_del);
-  }
-
-  if (del_after) {
-    delete_start = gtk_text_buffer_create_mark(buffer, NULL, &stop_tag, TRUE);
-    delete_stop = gtk_text_buffer_create_mark(buffer, NULL, &stop_del, TRUE);
-  }
-
-  gtk_text_buffer_delete(buffer, &start_del, &start_tag);
-
-  if (del_after) {
-    gtk_text_buffer_get_iter_at_mark(buffer, &stop_tag, delete_start);
-    gtk_text_buffer_get_iter_at_mark(buffer, &stop_del, delete_stop);
-    gtk_text_buffer_delete(buffer, &stop_tag, &stop_del);
-  }
-}
-
-static gboolean
-has_tags(GtkTextIter *iter)
-{
-  GSList *tags;
-  tags = gtk_text_iter_get_tags(iter);
-
-  if (tags == NULL) {
-    return FALSE;
-  }
-
-  g_slist_free(tags);
-  return TRUE;
-}
-
-static void
 fix_tags(EditorPage *page)
 {
-  GtkTextIter start_bound;
-  GtkTextIter start_res;
-  GtkTextIter stop_res;
-
-  gtk_text_buffer_get_start_iter(page->content, &start_bound);
-
-  while (match_pattern("````?````", page->content, &start_bound, NULL,
-                       &start_res, &stop_res)) {
-    g_print("Code: %s\n", gtk_text_iter_get_text(&start_res, &stop_res));
-    insert_styling_tag(page->content, &start_res, &stop_res, 4, 4, 4, 4, "code");
-    gtk_text_buffer_get_start_iter(page->content, &start_bound);
-  }
-
-  while (match_pattern("\n### ?\n", page->content, &start_bound, NULL,
-                       &start_res, &stop_res)) {
-    g_print("Heading: %s\n", gtk_text_iter_get_text(&start_res, &stop_res));
-
-    if (!has_tags(&start_res) && !has_tags(&stop_res)) {
-      insert_styling_tag(page->content, &start_res, &stop_res, 5, 1, 4, 0, "h3");
-      gtk_text_buffer_get_start_iter(page->content, &start_bound);
-    } else {
-      start_bound = stop_res;
-    }
-  }
-
-  while (match_pattern("\n## ?\n", page->content, &start_bound, NULL,
-                       &start_res, &stop_res)) {
-    g_print("Heading: %s\n", gtk_text_iter_get_text(&start_res, &stop_res));
-
-    if (!has_tags(&start_res) && !has_tags(&stop_res)) {
-      insert_styling_tag(page->content, &start_res, &stop_res, 4, 1, 3, 0, "h2");
-      gtk_text_buffer_get_start_iter(page->content, &start_bound);
-    } else {
-      start_bound = stop_res;
-    }
-  }
-
-  while (match_pattern("\n# ?\n", page->content, &start_bound, NULL, &start_res,
-                       &stop_res)) {
-    g_print("Heading: %s\n", gtk_text_iter_get_text(&start_res, &stop_res));
-
-    if (!has_tags(&start_res) && !has_tags(&stop_res)) {
-      insert_styling_tag(page->content, &start_res, &stop_res, 3, 1, 2, 0, "h3");
-      gtk_text_buffer_get_start_iter(page->content, &start_bound);
-    } else {
-      start_bound = stop_res;
-    }
-  }
-
-  while (match_pattern("**?**", page->content, &start_bound, NULL, &start_res,
-                       &stop_res)) {
-    g_print("Bold: %s\n", gtk_text_iter_get_text(&start_res, &stop_res));
-
-    if (!has_tags(&start_res) && !has_tags(&stop_res)) {
-      insert_styling_tag(page->content, &start_res, &stop_res, 2, 2, 2, 2,
-                         "bold");
-      gtk_text_buffer_get_start_iter(page->content, &start_bound);
-    } else {
-      start_bound = stop_res;
-    }
-  }
-
-  gtk_text_buffer_get_start_iter(page->content, &start_bound);
+  utils_fix_specific_tag(page->content, "code", PATTERN_CODE, TRIM_PATTERN_CODE);
+  utils_fix_specific_tag(page->content, "h3", PATTERN_H1, TRIM_PATTERN_H1);
+  utils_fix_specific_tag(page->content, "h2", PATTERN_H2, TRIM_PATTERN_H2);
+  utils_fix_specific_tag(page->content, "h1", PATTERN_H3, TRIM_PATTERN_H3);
+  utils_fix_specific_tag(page->content, "bold", PATTERN_BOLD, TRIM_PATTERN_BOLD);
 
   /* Old:
   GtkTextIter start;

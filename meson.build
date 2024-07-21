@@ -16,11 +16,19 @@ main_sources = files([
   'notes_tag.c',
   'sidebar.c',
   'edit_tags.c',
+  'utils.c',
 ])
-
 
 
 executable('editor',
   sources: main_sources,
   dependencies : deps
 )
+
+noteslib = shared_library('notes',
+                        main_sources,
+                        dependencies : deps,
+                        install : false)
+
+
+subdir('test')
