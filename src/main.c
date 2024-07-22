@@ -20,7 +20,7 @@ TODO
 - Clean up various marks added to buffers
 - fix header wonkyness
 - style headers better
-
+- Add sync menu option
 */
 
 static GtkWindow *app_window;
@@ -474,6 +474,23 @@ build_menu(GtkWidget *header, GtkApplication *app)
 }
 
 static void
+set_icon(void)
+{
+  GdkDisplay *display;
+  GtkIconTheme *icon_theme;
+
+  display = gdk_display_get_default();
+  g_assert(display);
+
+  icon_theme = gtk_icon_theme_get_for_display(display);
+
+  if (gtk_icon_theme_has_icon(icon_theme, "com.github.jsol.notes-editor") != 1) {
+    // manage error
+    g_warning("Could not find icon");
+  }
+}
+
+static void
 activate(GtkApplication *app, gpointer user_data)
 {
   GtkWidget *window;
@@ -490,6 +507,8 @@ activate(GtkApplication *app, gpointer user_data)
   GtkEventController *event_controller;
   // EditorPage *page;
   GtkWidget *tags_list;
+
+  set_icon();
 
   textarea = gtk_text_view_new();
 

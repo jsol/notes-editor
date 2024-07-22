@@ -374,7 +374,6 @@ fix_anchors(EditorPage *page)
     gtk_text_iter_forward_char(&start_name);
     gtk_text_iter_backward_char(&stop_name);
     name = gtk_text_iter_get_text(&start_name, &stop_name);
-    g_message("FOUND NAME MATCH PATTERN: %s", name);
 
     /* place mark, modify buffer, continue search from mark */
     return_mark = gtk_text_buffer_create_mark(page->content, NULL, &stop_res,
@@ -778,7 +777,7 @@ editor_page_to_md(EditorPage *self)
   /* translate styled doc to md format
    header -> #[#[#]] Text
    anchor --> [Title]({{< ref "filename.md" >}} "Title")
-   code -> ````text ````
+   code -> \n````\ntext \n````\n
    bold -> **text**
   */
   gtk_text_buffer_get_start_iter(self->content, &iter);
@@ -790,7 +789,7 @@ editor_page_to_md(EditorPage *self)
     }
     if (gtk_text_iter_starts_tag(&iter, self->code) ||
         gtk_text_iter_ends_tag(&iter, self->code)) {
-      g_string_append(res, "````");
+      g_string_append(res, "\n````\n");
     }
     if (gtk_text_iter_starts_tag(&iter, self->headings[0])) {
       g_string_append(res, "\n# ");

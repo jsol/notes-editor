@@ -25,10 +25,7 @@ utils_match_pattern(const gchar *pattern,
     return FALSE;
   }
 
-  g_message("Matching pattern %s\n", pattern);
-
   if (stop_bound == NULL) {
-    g_message("Setting offset stop \n");
     gtk_text_buffer_get_end_iter(buffer, &stop);
     stop_bound = &stop;
   }
@@ -60,9 +57,6 @@ utils_match_pattern(const gchar *pattern,
     }
 
     if (pattern[pos] == '\n') {
-      g_message("Failed due to not being at start / stop of line with pattern "
-                "\\n (was %c)",
-                buff[0]);
       goto failed_match;
     }
 
@@ -92,7 +86,6 @@ utils_match_pattern(const gchar *pattern,
     if (pos == strlen(pattern)) {
       /* complete match */
       *stop_res = iter;
-      g_message("Completed match\n");
 
       c = gtk_text_iter_get_char(start_res);
       g_unichar_to_utf8(c, buff);
@@ -101,7 +94,6 @@ utils_match_pattern(const gchar *pattern,
         gtk_text_iter_forward_char(start_res);
         c = gtk_text_iter_get_char(start_res);
         g_unichar_to_utf8(c, buff);
-        g_message("Checking %c", buff[0]);
       }
 
       return true;
@@ -114,7 +106,6 @@ utils_match_pattern(const gchar *pattern,
     gtk_text_iter_forward_char(&iter);
   }
 
-  g_message("No match\n");
   return FALSE;
 }
 

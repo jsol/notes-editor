@@ -5,7 +5,7 @@ tests = [
 foreach test: tests
   test_name = '@0@-test'.format(test['name'])
   testexe = executable(test_name,  test_name + '.c',
-                        include_directories : '..',
+                        include_directories : '../src',
                        dependencies : deps,
                        link_with : noteslib)
 

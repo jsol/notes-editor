@@ -1,0 +1,5 @@
+*.deb
+dist/debian/changelog
+dist/notes-editor/usr/share/doc/notes-editor/changelog.gz
+dist/notes-editor/usr/bin/notes-editor
+build

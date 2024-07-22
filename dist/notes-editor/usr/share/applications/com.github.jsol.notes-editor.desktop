@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Notes Editor
+Exec=notes-editor %u
+Terminal=false
+Type=Application
+Icon=com.github.jsol.notes-editor
+Comment=View and edit notes
+Categories=Utility
+TryExec=notes-editor
+

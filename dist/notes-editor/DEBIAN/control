@@ -1,0 +1,10 @@
+Package: notes-editor
+Version: 1.0.3
+Section: utils
+Priority: optional
+Architecture: amd64
+Depends: libc6, libglib2.0-0 (>= 2.72.4), libadwaita-1-0 (>=1.1.7), libgtk-4-1 (>=4.6.9), libyaml-0-2 (>=0.2.5)
+Maintainer: Jens Olsson <jens@rootsy.nu>
+Description: View and edit notes
+ Write and tag notes, in a subset of the Hugo Markdown format.
+ The files maintain their Hugo draft status
