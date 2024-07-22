@@ -317,6 +317,7 @@ load_repo(const gchar *root_path, GHashTable *pages, GtkApplication *app)
   GDir *dir;
   gboolean page_set = FALSE;
   const gchar *filename;
+  GFile *sync_script;
 
   g_message("Loading name: %s", root_path);
 
@@ -337,6 +338,12 @@ load_repo(const gchar *root_path, GHashTable *pages, GtkApplication *app)
 
   while ((filename = g_dir_read_name(dir))) {
     printf("%s\n", filename);
+
+    if (g_strcmp0(filename, "sync.sh") == 0) {
+      sync_script = g_file_new_build_filename(root_path, filename, NULL);
+      g_object_set_data_full(G_OBJECT(app), "sync_script", sync_script,
+                             g_object_unref);
+    }
     if (!g_str_has_suffix(filename, ".md")) {
       continue;
     }
@@ -398,6 +405,57 @@ save_menu_cb(GSimpleAction *simple_action, GVariant *parameter, gpointer *data)
 }
 
 static void
+sync_done_cb(GObject *source_object, GAsyncResult *res, gpointer data)
+{
+  GSubprocess *subprocess = G_SUBPROCESS(source_object);
+  GtkApplication *app = (GtkApplication *) data;
+  GError *err = NULL;
+
+  AdwToastOverlay *toast_overlay = g_object_get_data(G_OBJECT(app),
+                                                     "toast_overlay");
+
+  if (!g_subprocess_wait_check_finish(subprocess, res, &err)) {
+    adw_toast_overlay_add_toast(toast_overlay,
+                                adw_toast_new(err != NULL ? err->message :
+                                                            "Sync failed"));
+    g_clear_error(&err);
+  } else {
+    adw_toast_overlay_add_toast(toast_overlay, adw_toast_new("Sync completed"));
+  }
+}
+
+static void
+sync_menu_cb(GSimpleAction *simple_action, GVariant *parameter, gpointer *data)
+{
+  GtkApplication *app = (GtkApplication *) data;
+  GError *err = NULL;
+  gchar *root_path;
+  GSubprocessLauncher *launcher;
+  GSubprocess *sync_process;
+
+  AdwToastOverlay *toast_overlay = g_object_get_data(G_OBJECT(app),
+                                                     "toast_overlay");
+  GFile *sync_script = g_object_get_data(G_OBJECT(app), "sync_script");
+
+  if (sync_script == NULL) {
+    adw_toast_overlay_add_toast(toast_overlay,
+                                adw_toast_new("No sync script present"));
+    return;
+  }
+  g_message("Running sync script!");
+
+  root_path = g_object_get_data(G_OBJECT(app), "save-path");
+
+  launcher = g_subprocess_launcher_new(G_SUBPROCESS_FLAGS_NONE);
+  g_subprocess_launcher_set_cwd(launcher, root_path);
+
+  sync_process = g_subprocess_launcher_spawn(launcher, &err,
+                                             g_file_peek_path(sync_script),
+                                             NULL);
+  g_subprocess_wait_check_async(sync_process, NULL, sync_done_cb, app);
+}
+
+static void
 new_menu_cb(GSimpleAction *simple_action, GVariant *parameter, gpointer *data)
 {
   GtkApplication *app = GTK_APPLICATION(data);
@@ -456,6 +514,10 @@ build_menu(GtkWidget *header, GtkApplication *app)
   g_menu_append_item(menubar, menu_item_menu);
   g_object_unref(menu_item_menu);
 
+  menu_item_menu = g_menu_item_new("Sync", "app.sync");
+  g_menu_append_item(menubar, menu_item_menu);
+  g_object_unref(menu_item_menu);
+
   GSimpleAction *act_open = g_simple_action_new("open", NULL);
   g_action_map_add_action(G_ACTION_MAP(app), G_ACTION(act_open));
   g_signal_connect(act_open, "activate", G_CALLBACK(open_menu_cb), app);
@@ -463,6 +525,10 @@ build_menu(GtkWidget *header, GtkApplication *app)
   GSimpleAction *act_save = g_simple_action_new("save", NULL);
   g_action_map_add_action(G_ACTION_MAP(app), G_ACTION(act_save));
   g_signal_connect(act_save, "activate", G_CALLBACK(save_menu_cb), app);
+
+  GSimpleAction *act_sync = g_simple_action_new("sync", NULL);
+  g_action_map_add_action(G_ACTION_MAP(app), G_ACTION(act_sync));
+  g_signal_connect(act_sync, "activate", G_CALLBACK(sync_menu_cb), app);
 
   GSimpleAction *act_new = g_simple_action_new("new", NULL);
   g_action_map_add_action(G_ACTION_MAP(app), G_ACTION(act_new));
@@ -507,6 +573,7 @@ activate(GtkApplication *app, gpointer user_data)
   GtkEventController *event_controller;
   // EditorPage *page;
   GtkWidget *tags_list;
+  GtkWidget *toast_overlay;
 
   set_icon();
 
@@ -535,7 +602,12 @@ activate(GtkApplication *app, gpointer user_data)
   gtk_widget_set_hexpand(content_header_box, TRUE);
   gtk_widget_set_hexpand(content_header, TRUE);
 
+  toast_overlay = adw_toast_overlay_new();
+
   gtk_box_append(GTK_BOX(content_header_box), content_header);
+
+  gtk_box_append(GTK_BOX(content_header_box), toast_overlay);
+
   gtk_box_append(GTK_BOX(content_header_box), styles_drop_down);
   gtk_box_append(GTK_BOX(content_header_box), tag_button);
   gtk_box_append(GTK_BOX(content_header_box), remove_button);
@@ -558,6 +630,7 @@ activate(GtkApplication *app, gpointer user_data)
   gtk_box_append(GTK_BOX(box), get_framed_content(tags_list, content_box));
 
   g_object_set_data(G_OBJECT(app), "content_header", content_header);
+  g_object_set_data(G_OBJECT(app), "toast_overlay", toast_overlay);
   g_object_set_data(G_OBJECT(app), "textarea", textarea);
   g_object_set_data(G_OBJECT(app), "tags_list", tags_list);
   g_object_set_data(G_OBJECT(app), "pages_list", pages_list);
