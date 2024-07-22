@@ -11,7 +11,6 @@
 #include "sidebar.h"
 /*
 TODO
-- Scroll page list
 - fix memory leaks (hash table for pages...),
 - fix g_object_unref
 - Fix delete page
