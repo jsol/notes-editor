@@ -121,3 +121,23 @@ notes_tag_list_add(NotesTagList *self, EditorPage *page)
     notes_tag_add_page(t, page);
   }
 }
+
+gchar **
+notes_tag_list_get_tags_not_on_page(NotesTagList *self, EditorPage *page)
+{
+  GStrvBuilder *res;
+
+  res = g_strv_builder_new();
+
+  for (guint i = 0; i < self->tags->len; i++) {
+    if (!g_ptr_array_find_with_equal_func(page->tags,notes_tag_name(self->tags->pdata[i]),
+                                          g_str_equal, NULL)) {
+      g_strv_builder_add(res, notes_tag_name(self->tags->pdata[i]));
+      g_print("Adding %s to list\n", notes_tag_name(self->tags->pdata[i]));
+    } else {
+      g_print("Already had %s\n", notes_tag_name(self->tags->pdata[i]));
+    }
+  }
+
+  return g_strv_builder_end(res);
+}

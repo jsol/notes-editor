@@ -20,4 +20,7 @@ GtkWidget *notes_tag_list_new(void);
 
 void notes_tag_list_add(NotesTagList *self, EditorPage *page);
 
+gchar **notes_tag_list_get_tags_not_on_page(NotesTagList *self,
+                                            EditorPage *page);
+
 G_END_DECLS

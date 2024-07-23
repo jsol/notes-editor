@@ -9,20 +9,23 @@
 #include "editor_page.h"
 #include "notes_tag_list.h"
 #include "sidebar.h"
+
 /*
 TODO
 - fix memory leaks (hash table for pages...),
 - fix g_object_unref
 - Fix delete page
 - Fix removing tag from page
-- Fix errors during closing of tags page
 - Clean up various marks added to buffers
-- fix header wonkyness
+- fix header/style tags wonkyness
 - style headers better
-- Add sync menu option
+- toast on save
+- improve toast layout
+
 */
 
 static GtkWindow *app_window;
+#define WS_NAME_FILE ".notes-editor"
 
 struct tag {
   GPtrArray *pages;
@@ -36,7 +39,7 @@ get_current_ws(void)
   gchar *save_file;
   gchar *path = NULL;
 
-  save_file = g_build_filename(g_getenv("HOME"), ".geditor", NULL);
+  save_file = g_build_filename(g_getenv("HOME"), WS_NAME_FILE, NULL);
 
   if (!g_file_get_contents(save_file, &path, NULL, &lerr)) {
     g_warning("Could not load workspace path: %s",
@@ -59,7 +62,7 @@ save_current_ws(const gchar *path)
     return;
   }
 
-  save_file = g_build_filename(g_getenv("HOME"), ".rpg_editor", NULL);
+  save_file = g_build_filename(g_getenv("HOME"), WS_NAME_FILE, NULL);
 
   if (!g_file_set_contents(save_file, path, -1, &lerr)) {
     g_warning("Could not save workspace path: %s",
@@ -605,8 +608,6 @@ activate(GtkApplication *app, gpointer user_data)
 
   gtk_box_append(GTK_BOX(content_header_box), content_header);
 
-  gtk_box_append(GTK_BOX(content_header_box), toast_overlay);
-
   gtk_box_append(GTK_BOX(content_header_box), styles_drop_down);
   gtk_box_append(GTK_BOX(content_header_box), tag_button);
   gtk_box_append(GTK_BOX(content_header_box), remove_button);
@@ -625,6 +626,7 @@ activate(GtkApplication *app, gpointer user_data)
   build_menu(header, app);
 
   box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
+
   gtk_box_append(GTK_BOX(box), header);
   gtk_box_append(GTK_BOX(box), get_framed_content(tags_list, content_box));
 
@@ -660,7 +662,9 @@ activate(GtkApplication *app, gpointer user_data)
                    G_CALLBACK(event_key_released), app);
   gtk_widget_add_controller(window, event_controller);
 
-  adw_application_window_set_content(ADW_APPLICATION_WINDOW(window), box);
+  adw_toast_overlay_set_child(ADW_TOAST_OVERLAY(toast_overlay), box);
+  adw_application_window_set_content(ADW_APPLICATION_WINDOW(window),
+                                     toast_overlay);
 
   gtk_scrolled_window_set_propagate_natural_height(GTK_SCROLLED_WINDOW(scroll),
                                                    TRUE);
