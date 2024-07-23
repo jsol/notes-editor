@@ -25,7 +25,8 @@ TODO
 */
 
 static GtkWindow *app_window;
-#define WS_NAME_FILE ".notes-editor"
+#define WS_NAME_FILE   ".notes-editor"
+#define APPLICATION_ID "com.github.jsol.notes-editor"
 
 struct tag {
   GPtrArray *pages;
@@ -552,7 +553,7 @@ set_icon(void)
 
   icon_theme = gtk_icon_theme_get_for_display(display);
 
-  if (gtk_icon_theme_has_icon(icon_theme, "com.github.jsol.notes-editor") != 1) {
+  if (gtk_icon_theme_has_icon(icon_theme, APPLICATION_ID) != 1) {
     // manage error
     g_warning("Could not find icon");
   }
@@ -683,7 +684,7 @@ main(int argc, char *argv[])
 {
   AdwApplication *app;
 
-  app = adw_application_new("org.gtk.example", 0);
+  app = adw_application_new(APPLICATION_ID, 0);
   g_signal_connect(app, "activate", G_CALLBACK(activate), NULL);
   g_application_run(G_APPLICATION(app), argc, argv);
 

@@ -1,3 +1,9 @@
+notes-editor (1.0.1) unstable; urgency=medium
+
+  * Fix icons
+
+ -- Jens Olsson <jens@rootsy.nu>  Tue, 23 Jul 2024 18:32:14 +0200
+
 notes-editor (1.0.0) unstable; urgency=medium
 
   * First deb file
