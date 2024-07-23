@@ -1,26 +1,8 @@
-notes-editor (1.0.3) unstable; urgency=medium
-
-  * More changes for the deb package
-
- -- Jens Olsson <jens@rootsy.nu>  Mon, 22 Jul 2024 13:25:06 +0200
-
-notes-editor (1.0.2) unstable; urgency=medium
-
-  * Correct the deb
-
- -- Jens Olsson <jens@rootsy.nu>  Mon, 22 Jul 2024 13:10:44 +0200
-
-notes-editor (1.0.1) unstable; urgency=medium
-
-  * Adding icon check
-
- -- Jens Olsson <jens@rootsy.nu>  Mon, 22 Jul 2024 13:02:43 +0200
-
 notes-editor (1.0.0) unstable; urgency=medium
 
   * First deb file
 
- -- Jens Olsson <jens@rootsy.nu>  Mon, 22 Jul 2024 12:55:08 +0200
+ -- Jens Olsson <jens@rootsy.nu>  Tue, 23 Jul 2024 18:20:39 +0200
 
 
 notes-editor (1.0.0) unstable; urgency=medium
