@@ -20,36 +20,39 @@ TODO
 - fix header/style tags wonkyness
 - style headers better
 - toast on save
-- improve toast layout
-
 */
 
 static GtkWindow *app_window;
+static gchar *workspace_path = NULL;
 #define WS_NAME_FILE   ".notes-editor"
 #define APPLICATION_ID "com.github.jsol.notes-editor"
 
-struct tag {
-  GPtrArray *pages;
-  gchar *name;
-};
-
-static gchar *
+static const gchar *
 get_current_ws(void)
 {
   GError *lerr = NULL;
   gchar *save_file;
   gchar *path = NULL;
 
+  if (workspace_path != NULL) {
+    return workspace_path;
+  }
+
   save_file = g_build_filename(g_getenv("HOME"), WS_NAME_FILE, NULL);
 
   if (!g_file_get_contents(save_file, &path, NULL, &lerr)) {
     g_warning("Could not load workspace path: %s",
               lerr->message != NULL ? lerr->message : "No error message");
+    g_clear_error(&lerr);
+    goto out;
   }
 
   g_free(save_file);
 
   g_strstrip(path);
+
+  workspace_path = path;
+out:
   return path;
 }
 
@@ -62,6 +65,9 @@ save_current_ws(const gchar *path)
   if (path == NULL) {
     return;
   }
+
+  g_free(workspace_path);
+  workspace_path = g_strdup(path);
 
   save_file = g_build_filename(g_getenv("HOME"), WS_NAME_FILE, NULL);
 
@@ -108,6 +114,8 @@ update_css(GHashTable *pages)
     "margin-bottom: -8px;} .in-list-button "
     "{padding: 0px; margin: 0px;  margin-left: 15px; margin-bottom: -8px;"
     " font-weight: normal;}");
+
+  g_assert(pages);
 
   display = gdk_display_get_default();
 
@@ -223,6 +231,8 @@ page_created(EditorPage *page, GObject *app)
   NotesTagList *tags_list;
   GQueue *pages_list;
 
+  g_print("Start page createsd\n");
+
   tags_list = g_object_get_data(app, "tags_list");
   pages_list = g_object_get_data(app, "pages_list");
 
@@ -254,25 +264,18 @@ save(GtkApplication *app, const gchar *base_path)
 {
   GQueue *pages_list;
   GError *lerr = NULL;
-  gchar *root;
+  const gchar *root;
 
   if (base_path == NULL) {
-    root = (gchar *) g_object_get_data(G_OBJECT(app), "save-path");
-    g_print("USING OLD BASE PATH: %s\n",
-            (gchar *) g_object_get_data(G_OBJECT(app), "save-path"));
+    root = get_current_ws();
   } else {
-    root = (gchar *) base_path;
+    root = base_path;
+    save_current_ws(root);
   }
 
   if (!prepare_folder(root)) {
     g_warning("Can not save to %s", base_path);
     return;
-  }
-
-  g_print("Before Saving file: %s\n", root);
-  if (base_path != NULL) {
-    g_object_set_data_full(G_OBJECT(app), "save-path", g_strdup(base_path),
-                           g_free);
   }
 
   pages_list = g_object_get_data(G_OBJECT(app), "pages_list");
@@ -299,8 +302,6 @@ save(GtkApplication *app, const gchar *base_path)
     g_free(full_path);
     g_string_free(content, TRUE);
   }
-
-  save_current_ws(root);
 }
 
 static void
@@ -314,21 +315,20 @@ pages_load_iter(G_GNUC_UNUSED gpointer key,
 }
 
 static void
-load_repo(const gchar *root_path, GHashTable *pages, GtkApplication *app)
+load_repo(GHashTable *pages, GtkApplication *app)
 {
   GError *lerr = NULL;
   GDir *dir;
   gboolean page_set = FALSE;
   const gchar *filename;
   GFile *sync_script;
+  const gchar *root_path;
+
+  g_assert(pages);
+
+  root_path = get_current_ws();
 
   g_message("Loading name: %s", root_path);
-
-  g_object_set_data_full(G_OBJECT(app), "save-path", g_strdup(root_path),
-                         g_free);
-
-  g_message("Saved name as: %s",
-            (gchar *) g_object_get_data(G_OBJECT(app), "save-path"));
 
   dir = g_dir_open(root_path, 0, &lerr);
 
@@ -380,8 +380,8 @@ open_file_cb(GFile *file, gpointer user_data)
   g_assert(file);
   g_assert(app);
 
-  load_repo(g_file_peek_path(file), g_hash_table_new(g_str_hash, g_str_equal),
-            app);
+  save_current_ws(g_file_peek_path(file));
+  load_repo(g_hash_table_new(g_str_hash, g_str_equal), app);
 }
 
 static void
@@ -432,7 +432,7 @@ sync_menu_cb(GSimpleAction *simple_action, GVariant *parameter, gpointer *data)
 {
   GtkApplication *app = (GtkApplication *) data;
   GError *err = NULL;
-  gchar *root_path;
+  const gchar *root_path;
   GSubprocessLauncher *launcher;
   GSubprocess *sync_process;
 
@@ -447,7 +447,7 @@ sync_menu_cb(GSimpleAction *simple_action, GVariant *parameter, gpointer *data)
   }
   g_message("Running sync script!");
 
-  root_path = g_object_get_data(G_OBJECT(app), "save-path");
+  root_path = get_current_ws();
 
   launcher = g_subprocess_launcher_new(G_SUBPROCESS_FLAGS_NONE);
   g_subprocess_launcher_set_cwd(launcher, root_path);
@@ -486,7 +486,7 @@ event_key_released(G_GNUC_UNUSED GtkEventController *self,
   if (keyval == 115 && (state & GDK_CONTROL_MASK)) {
     /* ctrl+s */
 
-    gchar *save_path = g_object_get_data(G_OBJECT(app), "save-path");
+    const gchar *save_path = get_current_ws();
     if (save_path == NULL) {
       save_menu_cb(NULL, NULL, user_data);
     } else {
@@ -645,14 +645,12 @@ activate(GtkApplication *app, gpointer user_data)
 
   /* set_page(page, app); */
 
-  gchar *saved_path = get_current_ws();
+  const gchar *saved_path = get_current_ws();
 
   if (saved_path != NULL && strlen(saved_path) > 3) {
     g_message("Loading pages from %s", saved_path);
-    load_repo(saved_path, g_hash_table_new(g_str_hash, g_str_equal), app);
+    load_repo(g_hash_table_new(g_str_hash, g_str_equal), app);
   }
-
-  g_free(saved_path);
 
   g_signal_connect(styles_drop_down, "notify::selected-item",
                    G_CALLBACK(set_heading), app);
@@ -679,13 +677,30 @@ activate(GtkApplication *app, gpointer user_data)
   gtk_application_window_set_show_menubar(GTK_APPLICATION_WINDOW(window), TRUE);
 }
 
+static void
+open(GApplication *self,
+     gpointer files_pointer,
+     gint n_files,
+     G_GNUC_UNUSED gchar *hint,
+     G_GNUC_UNUSED gpointer user_data)
+{
+  GFile **files = (GFile **) files_pointer;
+
+  if (n_files >= 1) {
+    save_current_ws(g_file_peek_path(files[0]));
+  }
+
+  g_application_activate(self);
+}
+
 int
 main(int argc, char *argv[])
 {
   AdwApplication *app;
 
-  app = adw_application_new(APPLICATION_ID, 0);
+  app = adw_application_new(APPLICATION_ID, G_APPLICATION_HANDLES_OPEN);
   g_signal_connect(app, "activate", G_CALLBACK(activate), NULL);
+  g_signal_connect(app, "open", G_CALLBACK(open), NULL);
   g_application_run(G_APPLICATION(app), argc, argv);
 
   g_object_unref(app);

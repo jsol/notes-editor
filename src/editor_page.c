@@ -481,8 +481,10 @@ update_name(EditorPage *self, const gchar *old_name)
 
   g_ptr_array_foreach(self->buttons, foreach_button_name, self->heading);
 
-  g_hash_table_insert(self->pages, g_strdup(self->heading), self);
-  g_hash_table_remove(self->pages, old_name);
+  if (self->pages != NULL) {
+    g_hash_table_insert(self->pages, g_strdup(self->heading), self);
+    g_hash_table_remove(self->pages, old_name);
+  }
 }
 
 static void
@@ -532,11 +534,14 @@ set_property(GObject *object,
 {
   EditorPage *self = EDITOR_PAGE(object);
 
+  g_print("Kalling set property\n");
+
   switch ((EditorPageProperty) property_id) {
   case PROP_HEADING:
     gchar *old_name = self->heading;
 
     self->heading = g_value_dup_string(value);
+
     update_name(self, old_name);
     g_free(old_name);
     break;
@@ -550,6 +555,8 @@ set_property(GObject *object,
     G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
     break;
   }
+
+  g_print("After set property\n");
 }
 
 static void
@@ -560,6 +567,8 @@ editor_page_class_init(EditorPageClass *klass)
   object_class->finalize = editor_page_finalize;
   object_class->set_property = set_property;
   object_class->get_property = get_property;
+
+  g_print("Klass init\n");
 
   obj_properties[PROP_HEADING] = g_param_spec_string("heading", "Heading",
                                                      "Placeholder "
@@ -647,6 +656,8 @@ editor_page_new(const gchar *heading,
   static guint css_num = 0;
   EditorPage *self;
 
+  g_assert(pages);
+
   if (tags == NULL) {
     tags = g_ptr_array_new_with_free_func(g_free);
   }
@@ -655,19 +666,25 @@ editor_page_new(const gchar *heading,
     g_ptr_array_add(tags, g_strdup("Not tagged"));
   }
 
+  g_message("Creating GObject");
   self = g_object_new(EDITOR_TYPE_PAGE, "heading", heading, NULL);
+  g_message("After creating GObject");
 
   css_num++;
   self->css_name = g_strdup_printf("page%u", css_num);
   self->tags = tags;
   self->pages = pages;
+  g_message("Call insert");
   g_hash_table_insert(pages, g_strdup(heading), self);
+  g_message("after insert");
 
   g_signal_connect(self->content, "insert-text", G_CALLBACK(insert_text), self);
 
   self->created_cb = created_cb;
   self->user_data = user_data;
   ((create_cb) *self->created_cb)(self, self->user_data);
+
+  g_message("New page done");
 
   return self;
 }
@@ -835,6 +852,8 @@ editor_page_load(GHashTable *pages,
   gchar *text;
   gchar *draft;
   GPtrArray *tags;
+
+  g_assert(pages);
 
   if (!g_file_get_contents(filename, &content, &size, &lerr)) {
     g_warning("Could not open file: %s", lerr->message);
