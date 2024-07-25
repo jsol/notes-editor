@@ -72,7 +72,7 @@ GtkWidget *editor_page_in_list_button(EditorPage *self);
 GString *editor_page_to_md(EditorPage *self);
 
 EditorPage *editor_page_load(GHashTable *pages,
-                             gchar *filename,
+                             gchar *content,
                              GCallback created_cb,
                              gpointer user_data);
 void editor_page_fix_content(EditorPage *page);

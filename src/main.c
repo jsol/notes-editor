@@ -323,6 +323,7 @@ load_repo(GHashTable *pages, GtkApplication *app)
   const gchar *filename;
   GFile *sync_script;
   const gchar *root_path;
+  gchar *content = NULL;
 
   g_assert(pages);
 
@@ -355,13 +356,19 @@ load_repo(GHashTable *pages, GtkApplication *app)
     EditorPage *page;
 
     full_path = g_build_filename(root_path, filename, NULL);
-    page = editor_page_load(pages, full_path, G_CALLBACK(page_created), app);
+    if (!g_file_get_contents(filename, &content, NULL, &lerr)) {
+      g_warning("Could not open file: %s", lerr->message);
+      g_clear_error(&lerr);
+      continue;
+    }
+
+    page = editor_page_load(pages, content, G_CALLBACK(page_created), app);
 
     if (!page_set) {
       set_page(page, app);
       page_set = TRUE;
     }
-
+    g_free(content);
     g_free(full_path);
   }
 

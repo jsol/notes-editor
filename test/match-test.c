@@ -4,21 +4,21 @@
 #include "editor_page.h"
 #include "utils.h"
 
-#define PAJ_RECIPE               \
-  "## Ingredienser\n"            \
-  "- 200g Färsk grönkål\n"    \
-  "- 2 Rödlök\n"               \
-  "- Liten Matlagningsgrädde\n" \
-  "- 1dl Valnötter\n"           \
-  "- 2-3 Ägg\n"                 \
-  "- 1 msk Grönsaksfond\n"      \
-  "\n"                           \
-  "\n"                           \
-  "## Instruktioner\n"           \
-  "\n"                           \
-  "Mixa ihop ett pajskal\n"      \
-  "\n"                           \
-  "**Med lite bold text**\n"
+#define ALL_TAGS                    \
+  "---\n"                           \
+  "title: \"Test MD file\"\n"       \
+  "draft: true\n"                   \
+  "tags:\n"                         \
+  "  - Tag 1\n"                     \
+  "---\n"                           \
+  "# Header 1\n"                    \
+  "some text\nsome more text\n\n"   \
+  "## Header 2\n"                   \
+  "And some text. **bold text**.\n" \
+  "### Header 3\n"                  \
+  "some text\n"                     \
+  "````\nCode in monospace\n````\n" \
+  "Ending text"
 
 void
 test_match_bold(void)
@@ -109,7 +109,26 @@ test_match_h1_middle(void)
   g_message("H1 middle: %s\n", gtk_text_iter_get_text(&start_res, &stop_res));
 }
 
+void
+test_match_save_unchanged(void)
+{
+  EditorPage *p;
+  GHashTable *pages = g_hash_table_new(g_str_hash, g_str_equal);
+  GString *md;
+  gchar *input;
 
+  input = g_strdup(ALL_TAGS);
+  p = editor_page_load(pages, input, NULL, NULL);
+  md = editor_page_to_md(p);
+
+  g_message("Testing %s ", ALL_TAGS);
+
+  g_assert_cmpstr(ALL_TAGS, ==, md->str);
+
+  g_free(input);
+  g_string_free(md, TRUE);
+  g_object_unref(p);
+}
 
 int
 main(int argc, char *argv[])
@@ -121,7 +140,7 @@ main(int argc, char *argv[])
   g_test_add_func("/textbuffer/match/code", test_match_code);
   g_test_add_func("/textbuffer/match/h1/start", test_match_h1_start);
   g_test_add_func("/textbuffer/match/h1/middle", test_match_h1_middle);
-
+  g_test_add_func("/textbuffer/match/save/unchanged", test_match_save_unchanged);
 
   return g_test_run();
 }

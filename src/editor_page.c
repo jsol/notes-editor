@@ -173,7 +173,6 @@ add_link_anchor(gpointer user_data)
   gtk_text_buffer_get_iter_at_mark(buffer, &end, ctx->stop_mark);
 
   name = gtk_text_iter_get_text(&start, &end);
-  g_print("ADD_LINK NAME %s\n", name);
 
   gtk_text_iter_backward_char(&start);
   gtk_text_iter_backward_char(&start);
@@ -247,7 +246,6 @@ insert_text(GtkTextBuffer *self,
 
         gtk_text_iter_forward_char(&start_location);
         gtk_text_iter_forward_char(&start_location);
-        g_print("NAME: %s\n", name);
 
         ctx->start_mark = gtk_text_buffer_create_mark(self, NULL,
                                                       &start_location, TRUE);
@@ -263,7 +261,6 @@ insert_text(GtkTextBuffer *self,
     return;
   }
   last = text[0];
-  g_print("Inserted txt: %s\n", text);
 }
 
 static GtkTextMark *
@@ -291,7 +288,6 @@ fix_last_anchor(EditorPage *page, GtkTextMark *start_mark)
 
   if (!gtk_text_iter_backward_search(&start, "]]", GTK_TEXT_SEARCH_TEXT_ONLY,
                                      &match_stop_start, &match_stop_end, NULL)) {
-    g_print("DID NOT FIND ]]\n");
     return NULL;
   }
 
@@ -299,7 +295,6 @@ fix_last_anchor(EditorPage *page, GtkTextMark *start_mark)
                                      GTK_TEXT_SEARCH_TEXT_ONLY,
                                      &match_begin_start, &match_begin_end,
                                      NULL)) {
-    g_print("DID NOT FIND [[\n");
     return NULL;
   }
 
@@ -310,7 +305,6 @@ fix_last_anchor(EditorPage *page, GtkTextMark *start_mark)
 
   name = gtk_text_iter_get_text(&match_begin_end, &match_stop_start);
 
-  g_print("FOUND NAME: %s\n", name);
   if (!validate_name_only(name)) {
     return_mark = gtk_text_buffer_create_mark(buffer, NULL, &match_begin_start,
                                               TRUE);
@@ -344,7 +338,7 @@ fix_last_anchor(EditorPage *page, GtkTextMark *start_mark)
   g_object_set_data(G_OBJECT(button), "target", page);
 
   g_signal_emit(page, editor_signals[EDITOR_PAGE_NEW_ANCHOR], 0, anchor, button);
-  g_print("Returning a mark\n");
+
 out:
   g_free(name);
   return return_mark;
@@ -403,7 +397,6 @@ fix_anchors(EditorPage *page)
     g_object_set_data(G_OBJECT(button), "anchor", anchor);
     g_object_set_data(G_OBJECT(button), "target", page);
 
-    g_print("Emitting signal\n");
     g_signal_emit(page, editor_signals[EDITOR_PAGE_NEW_ANCHOR], 0, anchor,
                   button);
   }
@@ -534,8 +527,6 @@ set_property(GObject *object,
 {
   EditorPage *self = EDITOR_PAGE(object);
 
-  g_print("Kalling set property\n");
-
   switch ((EditorPageProperty) property_id) {
   case PROP_HEADING:
     gchar *old_name = self->heading;
@@ -555,8 +546,6 @@ set_property(GObject *object,
     G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
     break;
   }
-
-  g_print("After set property\n");
 }
 
 static void
@@ -567,8 +556,6 @@ editor_page_class_init(EditorPageClass *klass)
   object_class->finalize = editor_page_finalize;
   object_class->set_property = set_property;
   object_class->get_property = get_property;
-
-  g_print("Klass init\n");
 
   obj_properties[PROP_HEADING] = g_param_spec_string("heading", "Heading",
                                                      "Placeholder "
@@ -608,11 +595,6 @@ editor_page_init(EditorPage *self)
   /* initialize all public and private members to reasonable default values.
    * They are all automatically initialized to 0 to begin with. */
 
-  if (self->heading == NULL) {
-    g_print("Before the args\n");
-  } else {
-    g_print("After the args\n");
-  }
   /* Not sharing tags (for now at least) */
   self->content = gtk_text_buffer_new(NULL);
   self->anchors = g_ptr_array_new();
@@ -634,14 +616,11 @@ editor_page_init(EditorPage *self)
                                                  800, "size-points", 24.0, NULL);
   self->headings[2] = gtk_text_buffer_create_tag(self->content, "h3", "weight",
                                                  800, "size-points", 18.0, NULL);
-
-  g_print("After init\n");
 }
 
 static void
 change_page(G_GNUC_UNUSED GObject *button, EditorPage *self)
 {
-  g_print("Emit change page\n");
   g_signal_emit(self, editor_signals[EDITOR_PAGE_SWITCH], 0, self);
   // EMIT change page
 }
@@ -682,7 +661,9 @@ editor_page_new(const gchar *heading,
 
   self->created_cb = created_cb;
   self->user_data = user_data;
-  ((create_cb) *self->created_cb)(self, self->user_data);
+  if (self->created_cb != NULL) {
+    ((create_cb) *self->created_cb)(self, self->user_data);
+  }
 
   g_message("New page done");
 
@@ -789,7 +770,7 @@ editor_page_to_md(EditorPage *self)
   for (guint i = 0; i < self->tags->len; i++) {
     g_string_append_printf(res, "  - %s\n", (gchar *) self->tags->pdata[i]);
   }
-  g_string_append(res, "---\n\n");
+  g_string_append(res, "---\n");
 
   /* translate styled doc to md format
    header -> #[#[#]] Text
@@ -840,26 +821,17 @@ editor_page_to_md(EditorPage *self)
 
 EditorPage *
 editor_page_load(GHashTable *pages,
-                 gchar *filename,
+                 gchar *content,
                  GCallback created_cb,
                  gpointer user_data)
 {
-  GError *lerr = NULL;
-  gchar *content = NULL;
-  gsize size;
   gchar *name;
   EditorPage *page;
   gchar *text;
-  gchar *draft;
+  gchar *draft = NULL;
   GPtrArray *tags;
 
   g_assert(pages);
-
-  if (!g_file_get_contents(filename, &content, &size, &lerr)) {
-    g_warning("Could not open file: %s", lerr->message);
-    g_clear_error(&lerr);
-    return NULL;
-  }
 
   if (!g_str_has_prefix(content, "---")) {
     return NULL;
@@ -869,24 +841,22 @@ editor_page_load(GHashTable *pages,
 
   parse_header(content, &name, &draft, tags);
 
-  g_print("Name: %s\n", name);
-
   page = g_hash_table_lookup(pages, name);
 
   if (page == NULL) {
     page = editor_page_new(name, tags, pages, created_cb, user_data);
   }
 
-  g_free(page->draft);
-  page->draft = draft;
+  if (draft != NULL) {
+    g_free(page->draft);
+    page->draft = draft;
+  }
 
   text = g_strstr_len(content + 4, -1, "---");
   text += 3;
   g_strstrip(text);
 
   gtk_text_buffer_set_text(page->content, text, -1);
-
-  g_free(content);
 
   return page;
 }
@@ -912,12 +882,9 @@ editor_page_name_to_filename(const gchar *name)
 void
 editor_page_fix_content(EditorPage *page)
 {
-  g_print("Fixing anchors \n");
   fix_anchors(page);
 
   fix_tags(page);
-
-  g_print("Free content\n");
 }
 
 const gchar *const *
