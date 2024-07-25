@@ -1,6 +1,7 @@
 #include <glib.h>
 #include <gtk/gtk.h>
 
+#include "editor_page.h"
 #include "utils.h"
 
 gboolean
@@ -36,23 +37,33 @@ utils_match_pattern(const gchar *pattern,
     iter = *start_bound;
   }
   gtk_text_buffer_get_start_iter(buffer, &start_buff);
+  gboolean debug = g_strcmp0(pattern, PATTERN_CODE) == 0;
 
   while (!gtk_text_iter_equal(&iter, stop_bound)) {
     c = gtk_text_iter_get_char(&iter);
+    buff[0] = 0;
+    buff[1] = 0;
+    buff[2] = 0;
+    buff[3] = 0;
+    buff[4] = 0;
+    buff[5] = 0;
     g_unichar_to_utf8(c, buff);
 
     if (pattern[pos] == '\n' && pos == 0 &&
         (gtk_text_iter_starts_line(&iter) ||
          gtk_text_iter_equal(&start_buff, &iter))) {
-      if (gtk_text_iter_equal(&start_buff, &iter)) {
-        *start_res = iter;
-        pos++;
-        continue;
+      *start_res = iter;
+      pos++;
+      if (debug) {
+        g_message("Start buff match newline");
       }
-      goto have_match;
+      continue;
     }
 
     if (pattern[pos] == '\n' && pos > 0 && gtk_text_iter_ends_line(&iter)) {
+      if (debug) {
+        g_message("Non-start match newline");
+      }
       goto have_match;
     }
 
@@ -70,6 +81,8 @@ utils_match_pattern(const gchar *pattern,
     }
 
     if (buff[0] == pattern[pos]) {
+      if (debug)
+        g_message("Matched on '%c'", pattern[pos]);
       goto have_match;
     }
 
@@ -102,6 +115,9 @@ utils_match_pattern(const gchar *pattern,
     continue;
 
   failed_match:
+    if (debug)
+      g_message("Failed at match pos %d  with %c vs '%c' [%s]", pos,
+                pattern[pos], buff[0], buff);
     pos = 0;
     gtk_text_iter_forward_char(&iter);
   }
@@ -199,6 +215,8 @@ utils_insert_styling_tag(GtkTextBuffer *buffer,
   }
 
   if (do_start_del) {
+    g_message("Deleting from start (%s): %s", tag_name,
+              gtk_text_iter_get_text(&start_del, &start_tag));
     gtk_text_buffer_delete(buffer, &start_del, &start_tag);
   }
 
@@ -223,6 +241,8 @@ utils_fix_specific_tag(GtkTextBuffer *buffer,
 
   gtk_text_buffer_get_start_iter(buffer, &start_bound);
 
+  g_message("Fixing %s, %s", name, pattern);
+
   while (utils_match_pattern(pattern, buffer, &start_bound, NULL, &start_res,
                              &stop_res)) {
     if (!utils_has_tags(&start_res) && !utils_has_tags(&stop_res)) {
@@ -230,7 +250,9 @@ utils_fix_specific_tag(GtkTextBuffer *buffer,
 
       utils_insert_styling_tag(buffer, &start_res, &stop_res, trim, name);
       gtk_text_buffer_get_iter_at_mark(buffer, &start_bound, search_start);
+      g_message("... found %s", name);
     } else {
+      g_message("... found %s, but had tag", name);
       start_bound = stop_res;
     }
   }

@@ -416,9 +416,9 @@ static void
 fix_tags(EditorPage *page)
 {
   utils_fix_specific_tag(page->content, "code", PATTERN_CODE, TRIM_PATTERN_CODE);
-  utils_fix_specific_tag(page->content, "h3", PATTERN_H1, TRIM_PATTERN_H1);
+  utils_fix_specific_tag(page->content, "h3", PATTERN_H3, TRIM_PATTERN_H3);
   utils_fix_specific_tag(page->content, "h2", PATTERN_H2, TRIM_PATTERN_H2);
-  utils_fix_specific_tag(page->content, "h1", PATTERN_H3, TRIM_PATTERN_H3);
+  utils_fix_specific_tag(page->content, "h1", PATTERN_H1, TRIM_PATTERN_H1);
   utils_fix_specific_tag(page->content, "bold", PATTERN_BOLD, TRIM_PATTERN_BOLD);
 
   /* Old:
@@ -761,6 +761,7 @@ editor_page_to_md(EditorPage *self)
   GString *res = g_string_new("");
   GtkTextIter iter;
   gunichar c;
+  gunichar prev;
   GtkTextChildAnchor *anchor;
 
   /* write header */
@@ -787,16 +788,20 @@ editor_page_to_md(EditorPage *self)
     }
     if (gtk_text_iter_starts_tag(&iter, self->code) ||
         gtk_text_iter_ends_tag(&iter, self->code)) {
-      g_string_append(res, "\n````\n");
+      if (prev != 0x0A) {
+        g_string_append(res, "\n");
+        g_message("Unichar: %d / %c", prev, c);
+      }
+      g_string_append(res, "````\n");
     }
     if (gtk_text_iter_starts_tag(&iter, self->headings[0])) {
-      g_string_append(res, "\n# ");
+      g_string_append(res, "# ");
     }
     if (gtk_text_iter_starts_tag(&iter, self->headings[1])) {
-      g_string_append(res, "\n## ");
+      g_string_append(res, "## ");
     }
     if (gtk_text_iter_starts_tag(&iter, self->headings[2])) {
-      g_string_append(res, "\n### ");
+      g_string_append(res, "### ");
     }
 
     if (c == 0xFFFC) {
@@ -814,6 +819,7 @@ editor_page_to_md(EditorPage *self)
     }
 
     gtk_text_iter_forward_char(&iter);
+    prev = c;
   }
 
   return res;

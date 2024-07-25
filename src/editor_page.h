@@ -7,12 +7,12 @@ G_BEGIN_DECLS
 #define PATTERN_H1 "\n# ?\n"
 #define PATTERN_H2 "\n## ?\n"
 #define PATTERN_H3 "\n### ?\n"
-#define PATTERN_CODE "````?````"
+#define PATTERN_CODE "\n````\n?````\n"
 #define PATTERN_BOLD "**?**"
 #define TRIM_PATTERN_H1 "xx?s"
 #define TRIM_PATTERN_H2 "xxx?s"
 #define TRIM_PATTERN_H3 "xxxx?s"
-#define TRIM_PATTERN_CODE "xxxx?xxxx"
+#define TRIM_PATTERN_CODE "xxxxx?xxxxx"
 #define TRIM_PATTERN_BOLD "xx?xx"
 
 
