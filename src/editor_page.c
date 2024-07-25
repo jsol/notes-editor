@@ -859,10 +859,13 @@ editor_page_load(GHashTable *pages,
   }
 
   text = g_strstr_len(content + 4, -1, "---");
-  text += 3;
-  g_strstrip(text);
 
-  gtk_text_buffer_set_text(page->content, text, -1);
+  GString *c = g_string_new(text + 3);
+
+  g_strstrip(c->str);
+
+  g_string_append(c, "\n");
+  gtk_text_buffer_set_text(page->content, c->str, -1);
 
   return page;
 }
