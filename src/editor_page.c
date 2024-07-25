@@ -611,11 +611,11 @@ editor_page_init(EditorPage *self)
   self->code = gtk_text_buffer_create_tag(self->content, "code", "family",
                                           "Monospace", NULL);
   self->headings[0] = gtk_text_buffer_create_tag(self->content, "h1", "weight",
-                                                 800, "size-points", 32.0, NULL);
+                                                 800, "size-points", 20.0, NULL);
   self->headings[1] = gtk_text_buffer_create_tag(self->content, "h2", "weight",
-                                                 800, "size-points", 24.0, NULL);
+                                                 800, "size-points", 16.0, NULL);
   self->headings[2] = gtk_text_buffer_create_tag(self->content, "h3", "weight",
-                                                 800, "size-points", 18.0, NULL);
+                                                 800, "size-points", 12.0, NULL);
 }
 
 static void
