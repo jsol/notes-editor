@@ -155,7 +155,7 @@ static gboolean
 add_link_anchor(gpointer user_data)
 {
   struct add_link_ctx *ctx = (struct add_link_ctx *) user_data;
-  EditorPage *other;
+  EditorPage *other = NULL;
   GtkTextBuffer *buffer;
   GtkTextIter start, end;
   // GtkWidget *label;
@@ -182,12 +182,16 @@ add_link_anchor(gpointer user_data)
 
   anchor = gtk_text_buffer_create_child_anchor(buffer, &start);
 
-  other = g_hash_table_lookup(ctx->page->pages, name);
+  if (ctx->page->fetch_page != NULL) {
+    other = ctx->page->fetch_page(name, ctx->page->fetch_page_user_data);
+  }
 
   if (!other) {
-    other = editor_page_new(name, NULL, ctx->page->pages, ctx->page->created_cb,
-                            ctx->page->user_data);
+    other = editor_page_new(name, NULL, ctx->page->fetch_page,
+                            ctx->page->fetch_page_user_data,
+                            ctx->page->created_cb, ctx->page->user_data);
   }
+
   g_object_set_data(G_OBJECT(anchor), "target", other);
 
   g_ptr_array_add(ctx->page->anchors, g_object_ref(anchor));
@@ -267,7 +271,7 @@ static GtkTextMark *
 fix_last_anchor(EditorPage *page, GtkTextMark *start_mark)
 {
   GtkTextChildAnchor *anchor;
-  EditorPage *other;
+  EditorPage *other = NULL;
   GtkTextBuffer *buffer;
   GtkTextIter start;
   GtkTextIter match_begin_start;
@@ -320,10 +324,13 @@ fix_last_anchor(EditorPage *page, GtkTextMark *start_mark)
   gtk_text_buffer_get_iter_at_mark(buffer, &start, return_mark);
   anchor = gtk_text_buffer_create_child_anchor(buffer, &start);
 
-  other = g_hash_table_lookup(page->pages, name);
+  if (page->fetch_page != NULL) {
+    other = page->fetch_page(name, page->fetch_page_user_data);
+  }
 
   if (!other) {
-    other = editor_page_new(name, NULL, page->pages, page->created_cb,
+    other = editor_page_new(name, NULL, page->fetch_page,
+                            page->fetch_page_user_data, page->created_cb,
                             page->user_data);
   }
 
@@ -356,7 +363,7 @@ fix_anchors(EditorPage *page)
 
   GtkTextMark *return_mark = NULL;
   GtkTextChildAnchor *anchor;
-  EditorPage *other;
+  EditorPage *other = NULL;
 
   gtk_text_buffer_get_start_iter(page->content, &start_bound);
 
@@ -379,10 +386,13 @@ fix_anchors(EditorPage *page)
     gtk_text_buffer_get_iter_at_mark(page->content, &start_bound, return_mark);
     anchor = gtk_text_buffer_create_child_anchor(page->content, &start_bound);
 
-    other = g_hash_table_lookup(page->pages, name);
+    if (page->fetch_page != NULL) {
+      other = page->fetch_page(name, page->fetch_page_user_data);
+    }
 
     if (!other) {
-      other = editor_page_new(name, NULL, page->pages, page->created_cb,
+      other = editor_page_new(name, NULL, page->fetch_page,
+                              page->fetch_page_user_data, page->created_cb,
                               page->user_data);
     }
 
@@ -473,11 +483,6 @@ update_name(EditorPage *self, const gchar *old_name)
   }
 
   g_ptr_array_foreach(self->buttons, foreach_button_name, self->heading);
-
-  if (self->pages != NULL) {
-    g_hash_table_insert(self->pages, g_strdup(self->heading), self);
-    g_hash_table_remove(self->pages, old_name);
-  }
 }
 
 static void
@@ -628,14 +633,13 @@ change_page(G_GNUC_UNUSED GObject *button, EditorPage *self)
 EditorPage *
 editor_page_new(const gchar *heading,
                 GPtrArray *tags,
-                GHashTable *pages,
+                fetch_page_fn fetch_page,
+                gpointer fetch_page_user_data,
                 GCallback created_cb,
                 gpointer user_data)
 {
   static guint css_num = 0;
   EditorPage *self;
-
-  g_assert(pages);
 
   if (tags == NULL) {
     tags = g_ptr_array_new_with_free_func(g_free);
@@ -652,10 +656,8 @@ editor_page_new(const gchar *heading,
   css_num++;
   self->css_name = g_strdup_printf("page%u", css_num);
   self->tags = tags;
-  self->pages = pages;
-  g_message("Call insert");
-  g_hash_table_insert(pages, g_strdup(heading), self);
-  g_message("after insert");
+  self->fetch_page = fetch_page;
+  self->fetch_page_user_data = fetch_page_user_data;
 
   g_signal_connect(self->content, "insert-text", G_CALLBACK(insert_text), self);
 
@@ -826,18 +828,17 @@ editor_page_to_md(EditorPage *self)
 }
 
 EditorPage *
-editor_page_load(GHashTable *pages,
-                 gchar *content,
+editor_page_load(gchar *content,
+                 fetch_page_fn fetch_page,
+                 gpointer fetch_page_user_data,
                  GCallback created_cb,
                  gpointer user_data)
 {
   gchar *name;
-  EditorPage *page;
+  EditorPage *page = NULL;
   gchar *text;
   gchar *draft = NULL;
   GPtrArray *tags;
-
-  g_assert(pages);
 
   if (!g_str_has_prefix(content, "---")) {
     return NULL;
@@ -847,10 +848,13 @@ editor_page_load(GHashTable *pages,
 
   parse_header(content, &name, &draft, tags);
 
-  page = g_hash_table_lookup(pages, name);
+  if (fetch_page != NULL) {
+    page = fetch_page(name, fetch_page_user_data);
+  }
 
   if (page == NULL) {
-    page = editor_page_new(name, tags, pages, created_cb, user_data);
+    page = editor_page_new(name, tags, fetch_page, fetch_page_user_data,
+                           created_cb, user_data);
   }
 
   if (draft != NULL) {

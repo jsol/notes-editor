@@ -7,6 +7,7 @@
 #include "dialog.h"
 #include "edit_tags.h"
 #include "editor_page.h"
+#include "notes_page_list.h"
 #include "notes_tag_list.h"
 #include "sidebar.h"
 
@@ -105,7 +106,7 @@ header_changed(GtkEditable *self, gpointer user_data)
 }
 
 static void
-update_css(GHashTable *pages)
+update_css()
 {
   GdkDisplay *display;
   GtkCssProvider *provider;
@@ -114,8 +115,6 @@ update_css(GHashTable *pages)
     "margin-bottom: -8px;} .in-list-button "
     "{padding: 0px; margin: 0px;  margin-left: 15px; margin-bottom: -8px;"
     " font-weight: normal;}");
-
-  g_assert(pages);
 
   display = gdk_display_get_default();
 
@@ -225,25 +224,31 @@ set_tags(G_GNUC_UNUSED GObject *button, GObject *app)
   edit_tags_show(current_page, tags_list);
 }
 
+static EditorPage *
+fetch_page(const gchar *name, gpointer user_data)
+{
+  NotesPageList *pages_list = NOTES_PAGE_LIST(user_data);
+
+  return notes_page_list_find(pages_list, name);
+}
+
+
 static void
 page_created(EditorPage *page, GObject *app)
 {
   NotesTagList *tags_list;
-  GQueue *pages_list;
-
-  g_print("Start page createsd\n");
+  NotesPageList *pages_list;
 
   tags_list = g_object_get_data(app, "tags_list");
   pages_list = g_object_get_data(app, "pages_list");
 
-  g_queue_push_tail(pages_list, page);
   notes_tag_list_add(tags_list, page);
+  notes_page_list_add(pages_list, page);
 
   g_signal_connect(page, "switch-page", G_CALLBACK(set_page), app);
 
   g_signal_connect(page, "new-anchor", G_CALLBACK(single_anchor), app);
 
-  update_css(page->pages);
   g_print("Page created: %s\n", page->heading);
 }
 
@@ -260,10 +265,35 @@ prepare_folder(const gchar *base_path)
 }
 
 static void
+save_page_fn(EditorPage *page, gpointer user_data)
+{
+  gchar *root = (gchar *) user_data;
+  gchar *file;
+  gchar *full_path;
+  GString *content;
+  GError *lerr = NULL;
+
+  file = editor_page_name_to_filename(page->heading);
+  full_path = g_build_filename(root, file, NULL);
+
+  g_print("Saving file... %s  -> %s -> %s\n", root, file, full_path);
+
+  content = editor_page_to_md(page);
+
+  if (!g_file_set_contents(full_path, content->str, content->len, &lerr)) {
+    g_warning("Could not save %s: %s", full_path, lerr->message);
+    g_clear_error(&lerr);
+  }
+
+  g_free(file);
+  g_free(full_path);
+  g_string_free(content, TRUE);
+}
+
+static void
 save(GtkApplication *app, const gchar *base_path)
 {
-  GQueue *pages_list;
-  GError *lerr = NULL;
+  NotesPageList *pages_list;
   const gchar *root;
 
   if (base_path == NULL) {
@@ -279,43 +309,19 @@ save(GtkApplication *app, const gchar *base_path)
   }
 
   pages_list = g_object_get_data(G_OBJECT(app), "pages_list");
-
-  for (GList *iter = pages_list->head; iter != NULL; iter = iter->next) {
-    EditorPage *page = EDITOR_PAGE(iter->data);
-    gchar *file;
-    gchar *full_path;
-    GString *content;
-
-    file = editor_page_name_to_filename(page->heading);
-    full_path = g_build_filename(root, file, NULL);
-
-    g_print("Saving file... %s  -> %s -> %s\n", root, file, full_path);
-
-    content = editor_page_to_md(page);
-
-    if (!g_file_set_contents(full_path, content->str, content->len, &lerr)) {
-      g_warning("Could not save %s: %s", full_path, lerr->message);
-      g_clear_error(&lerr);
-    }
-
-    g_free(file);
-    g_free(full_path);
-    g_string_free(content, TRUE);
-  }
+  notes_page_list_for_each(pages_list, save_page_fn, root);
 }
 
 static void
-pages_load_iter(G_GNUC_UNUSED gpointer key,
-                gpointer value,
-                G_GNUC_UNUSED gpointer user_data)
+pages_load_iter(EditorPage *page, G_GNUC_UNUSED gpointer user_data)
 {
-  g_assert(value);
+  g_assert(page);
 
-  editor_page_fix_content(value);
+  editor_page_fix_content(page);
 }
 
 static void
-load_repo(GHashTable *pages, GtkApplication *app)
+load_repo(NotesPageList *pages_list, GtkApplication *app)
 {
   GError *lerr = NULL;
   GDir *dir;
@@ -325,7 +331,7 @@ load_repo(GHashTable *pages, GtkApplication *app)
   const gchar *root_path;
   gchar *content = NULL;
 
-  g_assert(pages);
+  g_assert(pages_list);
 
   root_path = get_current_ws();
 
@@ -362,7 +368,8 @@ load_repo(GHashTable *pages, GtkApplication *app)
       continue;
     }
 
-    page = editor_page_load(pages, content, G_CALLBACK(page_created), app);
+    page = editor_page_load(content, fetch_page, pages_list,
+                            G_CALLBACK(page_created), app);
 
     if (!page_set) {
       set_page(page, app);
@@ -374,21 +381,23 @@ load_repo(GHashTable *pages, GtkApplication *app)
 
   g_dir_close(dir);
 
-  g_hash_table_foreach(pages, pages_load_iter, NULL);
+  notes_page_list_for_each(pages_list, pages_load_iter, NULL);
 
-  update_css(pages);
+  update_css();
 }
 
 static void
 open_file_cb(GFile *file, gpointer user_data)
 {
   GtkApplication *app = GTK_APPLICATION(user_data);
+  NotesPageList *pages_list;
 
   g_assert(file);
   g_assert(app);
+  pages_list = g_object_get_data(G_OBJECT(app), "pages_list");
 
   save_current_ws(g_file_peek_path(file));
-  load_repo(g_hash_table_new(g_str_hash, g_str_equal), app);
+  load_repo(pages_list, app);
 }
 
 static void
@@ -465,16 +474,19 @@ sync_menu_cb(GSimpleAction *simple_action, GVariant *parameter, gpointer *data)
   g_subprocess_wait_check_async(sync_process, NULL, sync_done_cb, app);
 }
 
+
 static void
 new_menu_cb(GSimpleAction *simple_action, GVariant *parameter, gpointer *data)
 {
   GtkApplication *app = GTK_APPLICATION(data);
   EditorPage *page;
+  NotesPageList *pages_list;
 
   g_print("Setting new page!");
 
-  page = editor_page_new("Overview", NULL,
-                         g_hash_table_new(g_str_hash, g_str_equal),
+  pages_list = g_object_get_data(G_OBJECT(app), "pages_list");
+
+  page = editor_page_new("Overview", NULL, fetch_page, pages_list,
                          G_CALLBACK(page_created), app);
 
   set_page(page, app);
@@ -584,6 +596,7 @@ activate(GtkApplication *app, gpointer user_data)
   // EditorPage *page;
   GtkWidget *tags_list;
   GtkWidget *toast_overlay;
+  NotesPageList *pages_list;
 
   set_icon();
 
@@ -591,7 +604,7 @@ activate(GtkApplication *app, gpointer user_data)
 
   scroll = gtk_scrolled_window_new();
   tags_list = notes_tag_list_new();
-  GQueue *pages_list = g_queue_new();
+  pages_list = notes_page_list_new();
 
   content_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
   content_header = gtk_editable_label_new("");
@@ -656,7 +669,7 @@ activate(GtkApplication *app, gpointer user_data)
 
   if (saved_path != NULL && strlen(saved_path) > 3) {
     g_message("Loading pages from %s", saved_path);
-    load_repo(g_hash_table_new(g_str_hash, g_str_equal), app);
+    load_repo(pages_list, app);
   }
 
   g_signal_connect(styles_drop_down, "notify::selected-item",

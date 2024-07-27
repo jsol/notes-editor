@@ -3,15 +3,16 @@
 #include <glib-object.h>
 #include <gtk/gtk.h>
 
+
 G_BEGIN_DECLS
-#define PATTERN_H1 "\n# ?\n"
-#define PATTERN_H2 "\n## ?\n"
-#define PATTERN_H3 "\n### ?\n"
-#define PATTERN_CODE "\n````\n?````\n"
-#define PATTERN_BOLD "**?**"
-#define TRIM_PATTERN_H1 "xx?s"
-#define TRIM_PATTERN_H2 "xxx?s"
-#define TRIM_PATTERN_H3 "xxxx?s"
+#define PATTERN_H1        "\n# ?\n"
+#define PATTERN_H2        "\n## ?\n"
+#define PATTERN_H3        "\n### ?\n"
+#define PATTERN_CODE      "\n````\n?````\n"
+#define PATTERN_BOLD      "**?**"
+#define TRIM_PATTERN_H1   "xx?s"
+#define TRIM_PATTERN_H2   "xxx?s"
+#define TRIM_PATTERN_H3   "xxxx?s"
 #define TRIM_PATTERN_CODE "xxxxx?xxxxx"
 #define TRIM_PATTERN_BOLD "xx?xx"
 
@@ -25,6 +26,11 @@ enum style {
   STYLE_H2,
   STYLE_H3
 };
+
+#define EDITOR_TYPE_PAGE editor_page_get_type()
+G_DECLARE_FINAL_TYPE(EditorPage, editor_page, EDITOR, PAGE, GObject)
+
+typedef EditorPage *(*fetch_page_fn)(const gchar *heading, gpointer user_data);
 
 /** Public variables. Move to .c file to make private */
 struct _EditorPage {
@@ -40,9 +46,11 @@ struct _EditorPage {
   gchar *css_name;
   GdkRGBA color;
 
-  GHashTable *pages;
   GCallback created_cb;
   gpointer user_data;
+
+  fetch_page_fn fetch_page;
+  gpointer fetch_page_user_data;
 
   GtkTextTag *bold;
   GtkTextTag *code;
@@ -53,15 +61,13 @@ struct _EditorPage {
  * Type declaration.
  */
 
-#define EDITOR_TYPE_PAGE editor_page_get_type()
-G_DECLARE_FINAL_TYPE(EditorPage, editor_page, EDITOR, PAGE, GObject)
-
 /*
  * Method definitions.
  */
 EditorPage *editor_page_new(const gchar *heading,
                             GPtrArray *tags,
-                            GHashTable *pages,
+                            fetch_page_fn fetch_page,
+                            gpointer fetch_page_user_data,
                             GCallback created_cb,
                             gpointer user_data);
 
@@ -71,8 +77,9 @@ GtkWidget *editor_page_in_list_button(EditorPage *self);
 
 GString *editor_page_to_md(EditorPage *self);
 
-EditorPage *editor_page_load(GHashTable *pages,
-                             gchar *content,
+EditorPage *editor_page_load(gchar *content,
+                             fetch_page_fn fetch_page,
+                             gpointer fetch_page_user_data,
                              GCallback created_cb,
                              gpointer user_data);
 void editor_page_fix_content(EditorPage *page);

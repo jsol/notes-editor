@@ -11,6 +11,7 @@ main_sources = files([
   'main.c',
   'editor_page.c',
   'dialog.c',
+  'notes_page_list.c',
   'notes_tag_list.c',
   'notes_tag.c',
   'sidebar.c',
