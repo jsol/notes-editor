@@ -766,6 +766,7 @@ editor_page_to_md(EditorPage *self)
   gunichar prev;
   GtkTextChildAnchor *anchor;
   gboolean code = FALSE;
+  gboolean bold = FALSE;
 
   /* write header */
   g_string_append_printf(res, "---\ntitle: \"%s\"\ndraft: %s\ntags:\n",
@@ -788,6 +789,7 @@ editor_page_to_md(EditorPage *self)
     if (gtk_text_iter_starts_tag(&iter, self->bold) ||
         gtk_text_iter_ends_tag(&iter, self->bold)) {
       g_string_append(res, "**");
+      bold = !bold;
     }
     if (gtk_text_iter_starts_tag(&iter, self->code) ||
         gtk_text_iter_ends_tag(&iter, self->code)) {
@@ -828,6 +830,10 @@ editor_page_to_md(EditorPage *self)
 
   if (code) {
     g_string_append(res, "````\n");
+  }
+
+  if (bold) {
+    g_string_append(res, "**");
   }
 
   return res;
