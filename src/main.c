@@ -232,7 +232,6 @@ fetch_page(const gchar *name, gpointer user_data)
   return notes_page_list_find(pages_list, name);
 }
 
-
 static void
 page_created(EditorPage *page, GObject *app)
 {
@@ -309,7 +308,7 @@ save(GtkApplication *app, const gchar *base_path)
   }
 
   pages_list = g_object_get_data(G_OBJECT(app), "pages_list");
-  notes_page_list_for_each(pages_list, save_page_fn, root);
+  notes_page_list_for_each(pages_list, save_page_fn, (gpointer) root);
 }
 
 static void
@@ -362,7 +361,7 @@ load_repo(NotesPageList *pages_list, GtkApplication *app)
     EditorPage *page;
 
     full_path = g_build_filename(root_path, filename, NULL);
-    if (!g_file_get_contents(filename, &content, NULL, &lerr)) {
+    if (!g_file_get_contents(full_path, &content, NULL, &lerr)) {
       g_warning("Could not open file: %s", lerr->message);
       g_clear_error(&lerr);
       continue;
@@ -473,7 +472,6 @@ sync_menu_cb(GSimpleAction *simple_action, GVariant *parameter, gpointer *data)
                                              NULL);
   g_subprocess_wait_check_async(sync_process, NULL, sync_done_cb, app);
 }
-
 
 static void
 new_menu_cb(GSimpleAction *simple_action, GVariant *parameter, gpointer *data)

@@ -765,6 +765,7 @@ editor_page_to_md(EditorPage *self)
   gunichar c;
   gunichar prev;
   GtkTextChildAnchor *anchor;
+  gboolean code = FALSE;
 
   /* write header */
   g_string_append_printf(res, "---\ntitle: \"%s\"\ndraft: %s\ntags:\n",
@@ -795,6 +796,7 @@ editor_page_to_md(EditorPage *self)
         g_message("Unichar: %d / %c", prev, c);
       }
       g_string_append(res, "````\n");
+      code = !code;
     }
     if (gtk_text_iter_starts_tag(&iter, self->headings[0])) {
       g_string_append(res, "# ");
@@ -822,6 +824,10 @@ editor_page_to_md(EditorPage *self)
 
     gtk_text_iter_forward_char(&iter);
     prev = c;
+  }
+
+  if (code) {
+    g_string_append(res, "````\n");
   }
 
   return res;
@@ -867,6 +873,7 @@ editor_page_load(gchar *content,
   GString *c = g_string_new(text + 3);
 
   g_strstrip(c->str);
+  c->len = strlen(c->str);
 
   g_string_append(c, "\n");
   gtk_text_buffer_set_text(page->content, c->str, -1);

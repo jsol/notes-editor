@@ -18,7 +18,8 @@
   "### Header 3\n"                  \
   "some text\n"                     \
   "````\nCode in monospace\n````\n" \
-  "Ending text"
+  "Ending text\n"                   \
+  "````\nCode in monospace again\n````\n"
 
 #define ALL_TAGS_JUST_TEXT        \
   "Header 1\n"                    \
@@ -28,7 +29,8 @@
   "Header 3\n"                    \
   "some text\n"                   \
   "Code in monospace\n"           \
-  "Ending text"
+  "Ending text\n"                 \
+  "Code in monospace again\n"
 
 void
 test_match_bold(void)
@@ -119,7 +121,6 @@ test_match_h1_middle(void)
   g_message("H1 middle: %s\n", gtk_text_iter_get_text(&start_res, &stop_res));
 }
 
-
 void
 test_match_h3_start(void)
 {
@@ -146,7 +147,8 @@ void
 test_match_h3_middle(void)
 {
   GtkTextBuffer *content;
-  const gchar *text = "This is some text\n\n### This is a header\nAnd then some "
+  const gchar *text = "This is some text\n\n### This is a header\nAnd then "
+                      "some "
                       "text";
   gboolean res;
   GtkTextIter start_res;
@@ -164,16 +166,16 @@ test_match_h3_middle(void)
 
   g_message("H3 middle: %s\n", gtk_text_iter_get_text(&start_res, &stop_res));
 }
+
 void
 test_match_save_unchanged(void)
 {
   EditorPage *p;
-  GHashTable *pages = g_hash_table_new(g_str_hash, g_str_equal);
   GString *md;
   gchar *input;
 
   input = g_strdup(ALL_TAGS);
-  p = editor_page_load(pages, input, NULL, NULL);
+  p = editor_page_load(input, NULL, NULL, NULL, NULL);
   editor_page_fix_content(p);
   md = editor_page_to_md(p);
 
@@ -188,14 +190,13 @@ void
 test_match_load_strip_tags(void)
 {
   EditorPage *p;
-  GHashTable *pages = g_hash_table_new(g_str_hash, g_str_equal);
   gchar *input;
   gchar *output;
   GtkTextIter start;
   GtkTextIter end;
 
   input = g_strdup(ALL_TAGS);
-  p = editor_page_load(pages, input, NULL, NULL);
+  p = editor_page_load(input, NULL, NULL, NULL, NULL);
   editor_page_fix_content(p);
 
   gtk_text_buffer_get_start_iter(p->content, &start);
