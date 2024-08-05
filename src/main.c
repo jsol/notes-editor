@@ -148,15 +148,19 @@ set_page(EditorPage *page, GtkApplication *app)
   GtkWidget *textarea;
   EditorPage *current_page;
   GtkWidget *remove_button;
+  NotesPageList *pages_list;
 
-  content_header = g_object_get_data(G_OBJECT(app), "content_header");
-  textarea = g_object_get_data(G_OBJECT(app), "textarea");
   current_page = g_object_get_data(G_OBJECT(app), "current_page");
-  remove_button = g_object_get_data(G_OBJECT(app), "remove_button");
 
   if (current_page == page) {
     return;
   }
+
+  content_header = g_object_get_data(G_OBJECT(app), "content_header");
+  textarea = g_object_get_data(G_OBJECT(app), "textarea");
+  remove_button = g_object_get_data(G_OBJECT(app), "remove_button");
+  pages_list = g_object_get_data(G_OBJECT(app), "pages_list");
+
   g_signal_handlers_disconnect_matched(content_header, G_SIGNAL_MATCH_FUNC, 0,
                                        0, NULL, header_changed, NULL);
   g_signal_handlers_disconnect_matched(remove_button, G_SIGNAL_MATCH_FUNC, 0, 0,
@@ -173,6 +177,7 @@ set_page(EditorPage *page, GtkApplication *app)
 
   g_object_set_data(G_OBJECT(app), "current_page", page);
   g_print("Set current Page %p , app %p\n", page, app);
+  notes_page_list_set_current(pages_list, page);
 }
 
 static void
@@ -609,11 +614,12 @@ activate(GtkApplication *app, gpointer user_data)
   gtk_widget_add_css_class(content_header, "title-1");
   gtk_widget_set_margin_start(content_box, 20);
 
+  gtk_widget_set_halign(GTK_WIDGET(pages_list), GTK_ALIGN_END);
+
   styles_drop_down = gtk_drop_down_new_from_strings(editor_page_get_styles());
   gtk_widget_set_halign(styles_drop_down, GTK_ALIGN_END);
 
   tag_button = gtk_button_new_with_label("Tags");
-
   gtk_widget_set_halign(tag_button, GTK_ALIGN_END);
 
   remove_button = gtk_button_new_from_icon_name("edit-delete");
@@ -627,6 +633,7 @@ activate(GtkApplication *app, gpointer user_data)
 
   gtk_box_append(GTK_BOX(content_header_box), content_header);
 
+  gtk_box_append(GTK_BOX(content_header_box), GTK_WIDGET(pages_list));
   gtk_box_append(GTK_BOX(content_header_box), styles_drop_down);
   gtk_box_append(GTK_BOX(content_header_box), tag_button);
   gtk_box_append(GTK_BOX(content_header_box), remove_button);

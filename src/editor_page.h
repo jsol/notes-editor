@@ -84,6 +84,8 @@ EditorPage *editor_page_load(gchar *content,
                              gpointer user_data);
 void editor_page_fix_content(EditorPage *page);
 
+void editor_page_add_anchor(EditorPage *self, EditorPage *other);
+
 void editor_page_update_style(EditorPage *self, enum style style_id);
 
 gchar *editor_page_name_to_filename(const gchar *name);

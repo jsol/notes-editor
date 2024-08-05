@@ -5,9 +5,43 @@
 struct _NotesPageList {
   GtkBox parent;
   GPtrArray *pages;
+  GtkStringList *pages_list;
+  gchar *link_to;
+  gchar *new_page;
+  EditorPage *current;
 };
 
 G_DEFINE_TYPE(NotesPageList, notes_page_list, GTK_TYPE_BOX)
+
+static void
+add_link(GtkDropDown *drop_down,
+         G_GNUC_UNUSED GParamSpec *spec,
+         NotesPageList *self)
+{
+  guint selected;
+
+  selected = gtk_drop_down_get_selected(drop_down);
+
+  if (selected == 0) {
+    g_print("Not selected anything\n");
+    return;
+  }
+
+  if (selected == 1) {
+    g_print("Creating new page");
+    gtk_drop_down_set_selected(drop_down, 0);
+    editor_page_add_anchor(self->current, NULL);
+
+    return;
+  }
+
+  EditorPage *s = (EditorPage *) self->pages->pdata[selected - 2];
+  g_print("Selecting page %s.\n", s->heading);
+
+  editor_page_add_anchor(self->current, s);
+
+  gtk_drop_down_set_selected(drop_down, 0);
+}
 
 static void
 notes_page_list_dispose(GObject *obj)
@@ -15,6 +49,8 @@ notes_page_list_dispose(GObject *obj)
   NotesPageList *self = NOTES_PAGE_LIST(obj);
 
   g_assert(self);
+
+  g_clear_object(&self->current);
 
   /* TODO: Remove all listeners to page changes */
 
@@ -48,8 +84,20 @@ static void
 notes_page_list_init(NotesPageList *self)
 {
   g_assert(self);
+  GtkWidget *drop_down;
 
   self->pages = g_ptr_array_new_with_free_func(g_object_unref);
+  self->pages_list = gtk_string_list_new(NULL);
+  drop_down = gtk_drop_down_new(G_LIST_MODEL(self->pages_list), NULL);
+  self->link_to = g_strdup("< Link to >");
+  self->new_page = g_strdup("< Link to >");
+
+  gtk_box_append(GTK_BOX(self), drop_down);
+  gtk_string_list_append(self->pages_list, "< Link to >");
+  gtk_string_list_append(self->pages_list, "New page");
+
+  g_signal_connect(drop_down, "notify::selected-item", G_CALLBACK(add_link),
+                   self);
 }
 
 NotesPageList *
@@ -90,12 +138,14 @@ notes_page_list_add(NotesPageList *self, EditorPage *page)
   g_return_if_fail(page != NULL);
 
   g_ptr_array_add(self->pages, page);
+  gtk_string_list_append(self->pages_list, page->heading);
 }
 
 void
 notes_page_list_remove(NotesPageList *self, EditorPage *page)
 {
 }
+
 void
 notes_page_list_for_each(NotesPageList *self,
                          pages_for_each fn,
@@ -106,4 +156,11 @@ notes_page_list_for_each(NotesPageList *self,
   g_return_if_fail(fn != NULL);
 
   g_ptr_array_foreach(self->pages, (GFunc) fn, user_data);
+}
+
+void
+notes_page_list_set_current(NotesPageList *self, EditorPage *page)
+{
+  g_clear_object(&self->current);
+  self->current = g_object_ref(page);
 }

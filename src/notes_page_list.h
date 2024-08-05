@@ -24,4 +24,6 @@ void notes_page_list_for_each(NotesPageList *self,
                               pages_for_each fn,
                               gpointer user_data);
 
+void
+notes_page_list_set_current(NotesPageList *self, EditorPage *page);
 G_END_DECLS

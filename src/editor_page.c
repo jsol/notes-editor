@@ -918,3 +918,36 @@ editor_page_get_styles(void)
 {
   return available_styles;
 }
+
+void
+editor_page_add_anchor(EditorPage *self, EditorPage *other)
+{
+  GtkWidget *button;
+  GtkTextChildAnchor *anchor;
+  GtkTextIter iter;
+  GtkTextMark *insert;
+
+  g_return_if_fail(self != NULL);
+
+  insert = gtk_text_buffer_get_insert(self->content);
+  gtk_text_buffer_get_iter_at_mark(self->content, &iter, insert);
+  anchor = gtk_text_buffer_create_child_anchor(self->content, &iter);
+
+  if (!other) {
+    other = editor_page_new("New page", NULL, self->fetch_page,
+                            self->fetch_page_user_data, self->created_cb,
+                            self->user_data);
+  }
+
+  g_object_set_data(G_OBJECT(anchor), "target", other);
+
+  g_ptr_array_add(self->anchors, g_object_ref(anchor));
+
+  // gtk_text_view_add_child_at_anchor(textarea, widget, anchor);
+  /* EMIT new anchor */
+  button = editor_page_in_content_button(other);
+  g_object_set_data(G_OBJECT(button), "anchor", anchor);
+  g_object_set_data(G_OBJECT(button), "target", self);
+
+  g_signal_emit(self, editor_signals[EDITOR_PAGE_NEW_ANCHOR], 0, anchor, button);
+}
