@@ -19,8 +19,8 @@ TODO
 - Fix removing tag from page
 - Clean up various marks added to buffers
 - fix header/style tags wonkyness
-- style headers better
 - toast on save
+- "back" and "forwards" in page selections using alt+arrows
 */
 
 static GtkWindow *app_window;

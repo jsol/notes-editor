@@ -1,11 +1,11 @@
 #include "notes_page_list.h"
 #include <glib-object.h>
 #include <glib.h>
+#include "notes_page_store.h"
 
 struct _NotesPageList {
   GtkBox parent;
-  GPtrArray *pages;
-  GtkStringList *pages_list;
+  NotesPageStore *pages;
   gchar *link_to;
   gchar *new_page;
   EditorPage *current;
@@ -18,16 +18,15 @@ add_link(GtkDropDown *drop_down,
          G_GNUC_UNUSED GParamSpec *spec,
          NotesPageList *self)
 {
-  guint selected;
+  EditorPage *selected;
 
-  selected = gtk_drop_down_get_selected(drop_down);
+  selected = gtk_drop_down_get_selected_item(drop_down);
 
-  if (selected == 0) {
-    g_print("Not selected anything\n");
+  if (notes_page_store_page_noop(selected)) {
     return;
   }
 
-  if (selected == 1) {
+  if (notes_page_store_page_new(selected)) {
     g_print("Creating new page");
     gtk_drop_down_set_selected(drop_down, 0);
     editor_page_add_anchor(self->current, NULL);
@@ -35,10 +34,9 @@ add_link(GtkDropDown *drop_down,
     return;
   }
 
-  EditorPage *s = (EditorPage *) self->pages->pdata[selected - 2];
-  g_print("Selecting page %s.\n", s->heading);
+  g_print("Selecting page %s.\n", selected->heading);
 
-  editor_page_add_anchor(self->current, s);
+  editor_page_add_anchor(self->current, selected);
 
   gtk_drop_down_set_selected(drop_down, 0);
 }
@@ -64,7 +62,7 @@ notes_page_list_finalize(GObject *obj)
 
   g_assert(self);
 
-  g_clear_pointer(&self->pages, g_ptr_array_unref);
+  g_clear_object(&self->pages);
 
   /* Always chain up to the parent finalize function to complete object
    * destruction. */
@@ -86,15 +84,12 @@ notes_page_list_init(NotesPageList *self)
   g_assert(self);
   GtkWidget *drop_down;
 
-  self->pages = g_ptr_array_new_with_free_func(g_object_unref);
-  self->pages_list = gtk_string_list_new(NULL);
-  drop_down = gtk_drop_down_new(G_LIST_MODEL(self->pages_list), NULL);
-  self->link_to = g_strdup("< Link to >");
-  self->new_page = g_strdup("< Link to >");
+  self->pages = notes_page_store_new();
+  drop_down = gtk_drop_down_new(G_LIST_MODEL(self->pages),
+                                gtk_property_expression_new(EDITOR_TYPE_PAGE,
+                                                            NULL, "heading"));
 
   gtk_box_append(GTK_BOX(self), drop_down);
-  gtk_string_list_append(self->pages_list, "< Link to >");
-  gtk_string_list_append(self->pages_list, "New page");
 
   g_signal_connect(drop_down, "notify::selected-item", G_CALLBACK(add_link),
                    self);
@@ -106,29 +101,10 @@ notes_page_list_new(void)
   return g_object_new(NOTES_TYPE_PAGE_LIST, NULL);
 }
 
-static gboolean
-page_heading_equal(gconstpointer a, gconstpointer b)
-{
-  /* a is tag object from array, b is gchar tag name */
-  EditorPage *p = EDITOR_PAGE((gpointer) a);
-  const gchar *heading = (const gchar *) b;
-
-  return g_strcmp0(heading, p->heading) == 0;
-}
-
 EditorPage *
 notes_page_list_find(NotesPageList *self, const gchar *heading)
 {
-  guint index = 0;
-  g_return_val_if_fail(self != NULL, NULL);
-  g_return_val_if_fail(heading != NULL, NULL);
-
-  if (!g_ptr_array_find_with_equal_func(self->pages, heading,
-                                        page_heading_equal, &index)) {
-    return NULL;
-  }
-
-  return self->pages->pdata[index];
+  return notes_page_store_find(self->pages, heading);
 }
 
 void
@@ -137,8 +113,7 @@ notes_page_list_add(NotesPageList *self, EditorPage *page)
   g_return_if_fail(self != NULL);
   g_return_if_fail(page != NULL);
 
-  g_ptr_array_add(self->pages, page);
-  gtk_string_list_append(self->pages_list, page->heading);
+  notes_page_store_add(self->pages, page);
 }
 
 void
@@ -155,7 +130,7 @@ notes_page_list_for_each(NotesPageList *self,
   g_return_if_fail(self != NULL);
   g_return_if_fail(fn != NULL);
 
-  g_ptr_array_foreach(self->pages, (GFunc) fn, user_data);
+  notes_page_store_foreach(self->pages, (GFunc) fn, user_data);
 }
 
 void

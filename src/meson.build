@@ -12,6 +12,7 @@ main_sources = files([
   'editor_page.c',
   'dialog.c',
   'notes_page_list.c',
+  'notes_page_store.c',
   'notes_tag_list.c',
   'notes_tag.c',
   'sidebar.c',
