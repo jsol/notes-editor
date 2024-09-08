@@ -2,8 +2,10 @@
 #include <glib-object.h>
 #include <glib.h>
 #include <gtk/gtk.h>
+#include <pango/pango.h> /* style */
 #include <yaml.h>
 
+#include "markdown.h"
 #include "utils.h"
 
 G_DEFINE_TYPE(EditorPage, editor_page, G_TYPE_OBJECT)
@@ -128,30 +130,6 @@ validate_name(const gchar *name)
 }
 
 static gboolean
-validate_name_only(const gchar *name)
-{
-  g_assert(name);
-
-  while (name[0] != '\0') {
-    gunichar utf_c;
-
-    utf_c = g_utf8_get_char(name);
-
-    if (!g_unichar_isprint(utf_c)) {
-      return FALSE;
-    }
-
-    if (g_unichar_isspace(utf_c) && name[0] != ' ') {
-      return FALSE;
-    }
-
-    name = g_utf8_next_char(name);
-  }
-
-  return TRUE;
-}
-
-static gboolean
 add_link_anchor(gpointer user_data)
 {
   struct add_link_ctx *ctx = (struct add_link_ctx *) user_data;
@@ -265,203 +243,6 @@ insert_text(GtkTextBuffer *self,
     return;
   }
   last = text[0];
-}
-
-static GtkTextMark *
-fix_last_anchor(EditorPage *page, GtkTextMark *start_mark)
-{
-  GtkTextChildAnchor *anchor;
-  EditorPage *other = NULL;
-  GtkTextBuffer *buffer;
-  GtkTextIter start;
-  GtkTextIter match_begin_start;
-  GtkTextIter match_begin_end;
-  GtkTextIter match_stop_start;
-  GtkTextIter match_stop_end;
-  gchar *name;
-  GtkTextMark *return_mark = NULL;
-  GtkWidget *button;
-
-  buffer = page->content;
-
-  if (start_mark != NULL) {
-    gtk_text_buffer_get_iter_at_mark(buffer, &start, start_mark);
-  } else {
-    gtk_text_buffer_get_end_iter(buffer, &start);
-  }
-
-  if (!gtk_text_iter_backward_search(&start, "]]", GTK_TEXT_SEARCH_TEXT_ONLY,
-                                     &match_stop_start, &match_stop_end, NULL)) {
-    return NULL;
-  }
-
-  if (!gtk_text_iter_backward_search(&match_stop_start, "[[",
-                                     GTK_TEXT_SEARCH_TEXT_ONLY,
-                                     &match_begin_start, &match_begin_end,
-                                     NULL)) {
-    return NULL;
-  }
-
-  gtk_text_iter_backward_char(&match_begin_start);
-  return_mark = gtk_text_buffer_create_mark(buffer, NULL, &match_begin_start,
-                                            TRUE);
-  gtk_text_iter_forward_char(&match_begin_start);
-
-  name = gtk_text_iter_get_text(&match_begin_end, &match_stop_start);
-
-  if (!validate_name_only(name)) {
-    return_mark = gtk_text_buffer_create_mark(buffer, NULL, &match_begin_start,
-                                              TRUE);
-    goto out;
-  }
-
-  return_mark = gtk_text_buffer_create_mark(buffer, NULL, &match_begin_start,
-                                            TRUE);
-
-  /* Invalidates all the iterators above */
-  gtk_text_buffer_delete(buffer, &match_begin_start, &match_stop_end);
-
-  gtk_text_buffer_get_iter_at_mark(buffer, &start, return_mark);
-  anchor = gtk_text_buffer_create_child_anchor(buffer, &start);
-
-  if (page->fetch_page != NULL) {
-    other = page->fetch_page(name, page->fetch_page_user_data);
-  }
-
-  if (!other) {
-    other = editor_page_new(name, NULL, page->fetch_page,
-                            page->fetch_page_user_data, page->created_cb,
-                            page->user_data);
-  }
-
-  g_object_set_data(G_OBJECT(anchor), "target", other);
-
-  g_ptr_array_add(page->anchors, g_object_ref(anchor));
-
-  // gtk_text_view_add_child_at_anchor(textarea, widget, anchor);
-  /* EMIT new anchor */
-  button = editor_page_in_content_button(other);
-  g_object_set_data(G_OBJECT(button), "anchor", anchor);
-  g_object_set_data(G_OBJECT(button), "target", page);
-
-  g_signal_emit(page, editor_signals[EDITOR_PAGE_NEW_ANCHOR], 0, anchor, button);
-
-out:
-  g_free(name);
-  return return_mark;
-}
-
-static void
-fix_anchors(EditorPage *page)
-{
-  GtkTextIter start_bound = { 0 };
-  GtkTextIter start_res = { 0 };
-  GtkTextIter stop_res = { 0 };
-  GtkTextIter start_name = { 0 };
-  GtkTextIter stop_name = { 0 };
-  const gchar *name;
-
-  GtkTextMark *return_mark = NULL;
-  GtkTextChildAnchor *anchor;
-  EditorPage *other = NULL;
-
-  gtk_text_buffer_get_start_iter(page->content, &start_bound);
-
-  while (utils_match_pattern("[?]({{< ref \"?\" >}} \"?\")", page->content,
-                             &start_bound, NULL, &start_res, &stop_res)) {
-    utils_match_pattern("[?]", page->content, &start_res, &stop_res,
-                        &start_name, &stop_name);
-
-    gtk_text_iter_forward_char(&start_name);
-    gtk_text_iter_backward_char(&stop_name);
-    name = gtk_text_iter_get_text(&start_name, &stop_name);
-
-    /* place mark, modify buffer, continue search from mark */
-    return_mark = gtk_text_buffer_create_mark(page->content, NULL, &stop_res,
-                                              TRUE);
-
-    /* Invalidates all the iterators above */
-    gtk_text_buffer_delete(page->content, &start_res, &stop_res);
-
-    gtk_text_buffer_get_iter_at_mark(page->content, &start_bound, return_mark);
-    anchor = gtk_text_buffer_create_child_anchor(page->content, &start_bound);
-
-    if (page->fetch_page != NULL) {
-      other = page->fetch_page(name, page->fetch_page_user_data);
-    }
-
-    if (!other) {
-      other = editor_page_new(name, NULL, page->fetch_page,
-                              page->fetch_page_user_data, page->created_cb,
-                              page->user_data);
-    }
-
-    g_object_set_data(G_OBJECT(anchor), "target", other);
-
-    g_ptr_array_add(page->anchors, g_object_ref(anchor));
-
-    // gtk_text_view_add_child_at_anchor(textarea, widget, anchor);
-    /* EMIT new anchor */
-    GtkWidget *button;
-    button = editor_page_in_content_button(other);
-    g_object_set_data(G_OBJECT(button), "anchor", anchor);
-    g_object_set_data(G_OBJECT(button), "target", page);
-
-    g_signal_emit(page, editor_signals[EDITOR_PAGE_NEW_ANCHOR], 0, anchor,
-                  button);
-  }
-
-  if (1) {
-    /* old solution */
-    GtkTextMark *mark = NULL;
-
-    mark = fix_last_anchor(page, mark);
-    while (mark != NULL) {
-      mark = fix_last_anchor(page, mark);
-    }
-  }
-}
-
-static void
-fix_tags(EditorPage *page)
-{
-  utils_fix_specific_tag(page->content, "code", PATTERN_CODE, TRIM_PATTERN_CODE);
-  utils_fix_specific_tag(page->content, "h3", PATTERN_H3, TRIM_PATTERN_H3);
-  utils_fix_specific_tag(page->content, "h2", PATTERN_H2, TRIM_PATTERN_H2);
-  utils_fix_specific_tag(page->content, "h1", PATTERN_H1, TRIM_PATTERN_H1);
-  utils_fix_specific_tag(page->content, "bold", PATTERN_BOLD, TRIM_PATTERN_BOLD);
-
-  /* Old:
-  GtkTextIter start;
-  GtkTextIter match_start;
-  GtkTextIter match_end;
-  GtkTextIter bold_end_iter;
-  GtkTextMark *mark = NULL;
-  GtkTextMark *bold_end = NULL;
-  gboolean bold;
-
-  gtk_text_buffer_get_end_iter(page->content, &start);
-
-  while (true) {
-    if (!gtk_text_iter_backward_search(&start, "**",
-  GTK_TEXT_SEARCH_TEXT_ONLY, &match_start, &match_end, NULL)) { return;
-    }
-
-    mark = gtk_text_buffer_create_mark(page->content, NULL, &match_start,
-  TRUE);
-
-    if (!bold) {
-      bold_end = gtk_text_buffer_create_mark(page->content, NULL,
-  &match_start, TRUE); bold = TRUE; } else {
-      gtk_text_buffer_get_iter_at_mark(page->content, &bold_end_iter,
-  bold_end); gtk_text_buffer_apply_tag_by_name(page->content, "bold",
-  &match_end, &bold_end_iter); bold = FALSE;
-    }
-
-    gtk_text_buffer_delete(page->content, &match_start, &match_end);
-
-    gtk_text_buffer_get_iter_at_mark(page->content, &start, mark);
-    */
 }
 
 static void
@@ -612,6 +393,9 @@ editor_page_init(EditorPage *self)
 
   self->bold = gtk_text_buffer_create_tag(self->content, "bold", "weight", 800,
                                           NULL);
+
+  self->bold = gtk_text_buffer_create_tag(self->content, "emph", "style",
+                                          PANGO_STYLE_ITALIC, NULL);
 
   self->code = gtk_text_buffer_create_tag(self->content, "code", "family",
                                           "Monospace", NULL);
@@ -882,7 +666,10 @@ editor_page_load(gchar *content,
   c->len = strlen(c->str);
 
   g_string_append(c, "\n");
-  gtk_text_buffer_set_text(page->content, c->str, -1);
+  page->waiting = c->str;
+  g_print("Setting waiting to %s", page->waiting);
+
+  g_string_free(c, FALSE);
 
   return page;
 }
@@ -906,11 +693,53 @@ editor_page_name_to_filename(const gchar *name)
 }
 
 void
+new_link_anchor_cb(const gchar *heading,
+                   GtkTextChildAnchor *anchor,
+                   gpointer user_data)
+{
+  EditorPage *self = EDITOR_PAGE(user_data);
+  EditorPage *other = NULL;
+  GtkWidget *button;
+
+  g_assert(heading);
+  g_assert(anchor);
+
+  if (self->fetch_page != NULL) {
+    other = self->fetch_page(heading, self->fetch_page_user_data);
+  }
+
+  if (!other) {
+    other = editor_page_new("New page", NULL, self->fetch_page,
+                            self->fetch_page_user_data, self->created_cb,
+                            self->user_data);
+  }
+
+  g_object_set_data(G_OBJECT(anchor), "target", other);
+
+  g_ptr_array_add(self->anchors, g_object_ref(anchor));
+
+  // gtk_text_view_add_child_at_anchor(textarea, widget, anchor);
+  /* EMIT new anchor */
+  button = editor_page_in_content_button(other);
+  g_object_set_data(G_OBJECT(button), "anchor", anchor);
+  g_object_set_data(G_OBJECT(button), "target", self);
+
+  g_signal_emit(self, editor_signals[EDITOR_PAGE_NEW_ANCHOR], 0, anchor, button);
+}
+
+void
 editor_page_fix_content(EditorPage *page)
 {
-  fix_anchors(page);
+  struct report_anchor ctx = { 0 };
 
-  fix_tags(page);
+  if (page->waiting == NULL) {
+    g_print("No content waiting for %s", page->heading);
+    return;
+  }
+
+  ctx.link = new_link_anchor_cb;
+  ctx.link_user_data = page;
+  markdown_to_text_buffer(page->waiting, page->content, &ctx);
 }
 
 const gchar *const *

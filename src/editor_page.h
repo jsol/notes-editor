@@ -42,6 +42,7 @@ struct _EditorPage {
   GPtrArray *buttons;
   GPtrArray *tags;
   gchar *draft;
+  gchar *waiting;
 
   gchar *css_name;
   GdkRGBA color;
