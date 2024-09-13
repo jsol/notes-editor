@@ -5,6 +5,19 @@
 
 #include "markdown.h"
 
+struct nodes;
+
+typedef cmark_node *(*create_node)(GtkTextIter *iter,
+                                   struct nodes *info,
+                                   guint index);
+
+struct nodes {
+  cmark_node_type type;
+  create_node create_func;
+  GtkTextTag *tag;
+  gpointer user_data;
+};
+
 static void parse_document(cmark_node *document,
                            GtkTextBuffer *buffer,
                            struct report_anchor *ctx);
@@ -67,6 +80,43 @@ get_heading_tag(GtkTextBuffer *buffer, gint level)
   g_snprintf(name, 3, "h%d", level);
 
   return get_tag(buffer, name);
+}
+
+static cmark_node *
+create_text_node(GtkTextIter *iter,
+                 cmark_node *parent,
+                 struct nodes *info,
+                 guint index)
+{
+  cmark_node *node = cmark_node_new(info[index].type);
+
+  return node;
+}
+
+static cmark_node *
+create_heading_node(GtkTextIter *iter,
+                    cmark_node *parent,
+                    struct nodes *info,
+                    guint index)
+{
+  cmark_node *node;
+
+  node = create_text_node(iter, parent, info, index);
+
+  cmark_node_set_heading_level(node, GPOINTER_TO_INT(info[index].user_data));
+
+  return node;
+}
+
+static struct nodes *
+get_nodes(GtkTextBuffer *buffer)
+{
+  struct nodes *n = g_new0(struct nodes, 2);
+
+  n[0].tag = get_heading_tag(buffer, "h1");
+  m[0].type = CMARK_NODE_HEADING;
+  m[0].user_data = GINT_TO_POINTER(1);
+  m[0].create_func = create_heading_node;
 }
 
 static void
@@ -220,11 +270,6 @@ markdown_to_text_buffer(const gchar *markdown,
 }
 
 static cmark_node *
-get_bold()
-{
-}
-
-static cmark_node *
 get_link(GtkTextChildAnchor *anchor)
 {
   cmark_node *link;
@@ -235,8 +280,60 @@ get_link(GtkTextChildAnchor *anchor)
   g_free(file);
 }
 
-scan_until_tag_starts(GtkTextIter *iter, GQueue *stack) {
-    
+static cmark_node *
+string_to_node_and_reset(GString *text)
+{
+  cmark_node *node;
+
+  subsub = cmark_node_new(CMARK_NODE_TEXT);
+
+  cmark_node_set_literal(node, text->str);
+
+  g_string_set_size(text, 0);
+
+  return node;
+}
+
+static void
+iterate_buffer(GtkTextIter *iter,
+               struct nodes *info,
+               cmark_node *cur,
+
+               GtkTextTag *end,
+               gboolean check_first_tag)
+{
+  gunichar c;
+  cmark_node *node;
+  GString text;
+
+  text = g_string_new("");
+
+  while ((c = gtk_text_iter_get_char(iter)) > 0) {
+    if (check_first_tag) {
+      for (guint i = 0; info[i] != NULL; i++) {
+        if (gtk_text_iter_starts_tag(iter, info[i].tag)) {
+          node = string_to_node_and_reset(text);
+          cmark_node_append_child(cur, node);
+
+          node = info.create_func(iter, cur, info, i);
+          cmark_node_append_child(cur, node);
+        }
+      }
+    }
+
+    g_string_append(text, c);
+
+    if (end != NULL && gtk_text_iter_ends_tag(iter, end)) {
+      node = string_to_node_and_reset(text);
+      cmark_node_append_child(cur, node);
+      break;
+    }
+
+    check_first_tag = TRUE;
+    gtk_text_iter_forward_char(iter);
+  }
+
+  g_string_free(text, TRUE);
 }
 
 gchar *
