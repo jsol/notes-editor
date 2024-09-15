@@ -18,8 +18,13 @@ removed_clicked(GObject *button, gchar *tag_name)
   if (g_ptr_array_find_with_equal_func(page->tags, tag_name, g_str_equal,
                                        &index)) {
     g_ptr_array_remove_index(page->tags, index);
+#if GTK_MAJOR_VERSION >= 4 && GTK_MINOR_VERSION >= 10
+    gtk_widget_set_visible(GTK_WIDGET(label), FALSE);
+    gtk_widget_set_visible(GTK_WIDGET(button), FALSE);
+#else
     gtk_widget_hide(GTK_WIDGET(button));
     gtk_widget_hide(GTK_WIDGET(label));
+#endif
   }
 }
 

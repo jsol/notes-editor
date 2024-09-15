@@ -112,14 +112,19 @@ update_css()
   GtkCssProvider *provider;
   GString *style = g_string_new(
     ".in-text-button {padding: 0px; margin: 0px;  "
-    "margin-bottom: -8px;} .in-list-button "
+    "margin-bottom: -8px; font-variant-ligatures:common-ligatures; } "
+    ".in-list-button "
     "{padding: 0px; margin: 0px;  margin-left: 15px; margin-bottom: -8px;"
     " font-weight: normal;}");
 
   display = gdk_display_get_default();
 
   provider = gtk_css_provider_new();
+#if GTK_MAJOR_VERSION >= 4 && GTK_MINOR_VERSION >= 12
+  gtk_css_provider_load_from_string(provider, style->str);
+#else
   gtk_css_provider_load_from_data(provider, style->str, strlen(style->str));
+#endif
 
   gtk_style_context_add_provider_for_display(display,
                                              GTK_STYLE_PROVIDER(provider),

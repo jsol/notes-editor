@@ -1,5 +1,6 @@
 tests = [
-  { 'name': 'match'},
+  { 'name': 'markdown-parse'},
+  { 'name': 'markdown-print'},
 ]
 
 foreach test: tests

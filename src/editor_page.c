@@ -376,6 +376,34 @@ editor_page_class_init(EditorPageClass *klass)
 }
 
 static void
+setup_tag(enum markdown_tag_types type, GtkTextTag *tag)
+{
+  switch (type) {
+  case MARKDOWN_TAG_BOLD:
+    g_object_set(tag, "weight", 800, NULL);
+    break;
+  case MARKDOWN_TAG_EMPH:
+    g_object_set(tag, "style", PANGO_STYLE_ITALIC, NULL);
+    break;
+  case MARKDOWN_TAG_CODE:
+    g_object_set(tag, "family", "Monospace", NULL);
+    break;
+  case MARKDOWN_TAG_H1:
+    g_object_set(tag, "weight", 800, "size-points", 20.0, NULL);
+    break;
+  case MARKDOWN_TAG_H2:
+    g_object_set(tag, "weight", 800, "size-points", 16.0, NULL);
+    break;
+  case MARKDOWN_TAG_H3:
+    g_object_set(tag, "weight", 800, "size-points", 12.0, NULL);
+    break;
+
+  default:
+    g_warning("Unexpected tag type encountered: %u", type);
+  }
+}
+
+static void
 editor_page_init(EditorPage *self)
 {
   /* initialize all public and private members to reasonable default values.
@@ -391,20 +419,7 @@ editor_page_init(EditorPage *self)
   self->color.alpha = 1.0;
   self->draft = g_strdup("true");
 
-  self->bold = gtk_text_buffer_create_tag(self->content, "bold", "weight", 800,
-                                          NULL);
-
-  self->bold = gtk_text_buffer_create_tag(self->content, "emph", "style",
-                                          PANGO_STYLE_ITALIC, NULL);
-
-  self->code = gtk_text_buffer_create_tag(self->content, "code", "family",
-                                          "Monospace", NULL);
-  self->headings[0] = gtk_text_buffer_create_tag(self->content, "h1", "weight",
-                                                 800, "size-points", 20.0, NULL);
-  self->headings[1] = gtk_text_buffer_create_tag(self->content, "h2", "weight",
-                                                 800, "size-points", 16.0, NULL);
-  self->headings[2] = gtk_text_buffer_create_tag(self->content, "h3", "weight",
-                                                 800, "size-points", 12.0, NULL);
+  markdown_setup_tags(self->content, setup_tag);
 }
 
 static void

@@ -54,6 +54,7 @@ struct _EditorPage {
   gpointer fetch_page_user_data;
 
   GtkTextTag *bold;
+  GtkTextTag *emph;
   GtkTextTag *code;
   GtkTextTag *headings[3];
 };
