@@ -11,6 +11,9 @@ g_calloc0(gsize num, gsize s)
 static void
 print_node(cmark_node *node, cmark_event_type ev_type)
 {
+  gint length;
+  gint offset;
+  gchar character;
   switch (cmark_node_get_type(node)) {
   case CMARK_NODE_HEADING:
     if (ev_type == CMARK_EVENT_ENTER) {
@@ -30,6 +33,8 @@ print_node(cmark_node *node, cmark_event_type ev_type)
     break;
   case CMARK_NODE_CODE_BLOCK:
     g_print("Node name: %s: ", cmark_node_get_type_string(node));
+    cmark_node_get_fenced(node, &length, &offset, &character);
+    g_print("Fencing: %d, %d, %c\n", length, offset, character);
     g_print("\n<pre>%s</pre>\n", cmark_node_get_literal(node));
     break;
   default:
@@ -136,7 +141,8 @@ main(G_GNUC_UNUSED int argc, G_GNUC_UNUSED char **argv)
   cmark_node_append_child(child, sub);
   cmark_node_append_child(root, child);
 
-  gchar *res = cmark_render_commonmark_with_mem(root, CMARK_OPT_UNSAFE, 80, &mem);
+  gchar *res = cmark_render_commonmark_with_mem(root, CMARK_OPT_UNSAFE, 80,
+                                                &mem);
 
   g_print("==== Rendered MD ====\n%s\n==== End rendered MD ====\n", res);
 }

@@ -116,11 +116,11 @@ test_match_code_start(void)
   content = gtk_text_buffer_new(NULL);
   markdown_setup_tags(content, NULL);
 
-  markdown_to_text_buffer("````\nThis is some code\n````", content, &ctx);
+  markdown_to_text_buffer("````\nThis is some\ncode\n````", content, &ctx);
 
   res = markdown_from_text_buffer(content);
 
-  g_assert_cmpstr("````\nThis is some code\n````\n", ==, res);
+  g_assert_cmpstr("```  \nThis is some\ncode\n```\n", ==, res);
 
   g_clear_object(&content);
   g_free(res);

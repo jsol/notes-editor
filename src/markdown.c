@@ -36,6 +36,10 @@ static void iterate_buffer(GtkTextIter *iter,
                            GtkTextTag *end,
                            gboolean check_first_tag);
 
+static void iterate_text_buffer(GtkTextIter *iter,
+                                cmark_node *node,
+                                GtkTextTag *end);
+
 static gpointer
 g_calloc0(gsize num, gsize s)
 {
@@ -111,6 +115,37 @@ create_text_node(GtkTextIter *iter,
 }
 
 static cmark_node *
+create_literal_node(GtkTextIter *iter,
+                    cmark_node *parent,
+                    GHashTable *links,
+                    struct nodes *info,
+                    guint index)
+{
+  cmark_node *node = cmark_node_new(info[index].type);
+  g_message("Iterating node %u for sub nodes", index);
+  iterate_text_buffer(iter, node, info[index].tag);
+
+  return node;
+}
+
+static cmark_node *
+create_code_node(GtkTextIter *iter,
+                 cmark_node *parent,
+                 GHashTable *links,
+                 struct nodes *info,
+                 guint index)
+{
+  cmark_node *node;
+
+  node = create_literal_node(iter, parent, links, info, index);
+
+  cmark_node_set_fenced(node, 1, 3, 0, '`');
+  cmark_node_set_fence_info(node, " "); /* Store language type? */
+
+  return node;
+}
+
+static cmark_node *
 create_heading_node(GtkTextIter *iter,
                     cmark_node *parent,
                     GHashTable *links,
@@ -149,7 +184,7 @@ get_nodes(GtkTextBuffer *buffer)
   n[3].tag = get_tag(buffer, "code");
   n[3].type = CMARK_NODE_CODE_BLOCK;
   n[3].user_data = NULL;
-  n[3].create_func = create_text_node;
+  n[3].create_func = create_code_node;
 
   return n;
 }
@@ -324,6 +359,42 @@ add_string_to_node_and_reset(cmark_node *cur, GString *text)
   cmark_node_set_literal(node, text->str);
 
   g_string_set_size(text, 0);
+}
+
+static void
+iterate_text_buffer(GtkTextIter *iter, cmark_node *node, GtkTextTag *end)
+{
+  gunichar c;
+  GString *text;
+  gboolean first = TRUE;
+
+  g_assert(iter);
+  g_assert(node);
+  g_assert(end);
+
+  text = g_string_new("");
+
+  while ((c = gtk_text_iter_get_char(iter)) > 0) {
+    if (!first && gtk_text_iter_starts_tag(iter, NULL)) {
+      g_warning("Unexpected tag found");
+    }
+
+    if (c == 0xFFFC) {
+      g_warning("Unexpected anchor found");
+      continue;
+    }
+    g_string_append_unichar(text, c);
+
+    if (gtk_text_iter_ends_tag(iter, end)) {
+      break;
+    }
+
+    first = FALSE;
+    gtk_text_iter_forward_char(iter);
+  }
+
+  cmark_node_set_literal(node, text->str);
+  (void) g_string_free(text, TRUE);
 }
 
 static void
