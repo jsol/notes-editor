@@ -23,7 +23,7 @@ struct nodes {
 /* This must match the ENUMS */
 static const gchar *tag_names[] = { "bold", "emph", "code", "h1", "h2", "h3" };
 
-#define NODE_COUNT 4
+#define NODE_COUNT 5
 
 static void parse_document(cmark_node *document,
                            GtkTextBuffer *buffer,
@@ -185,6 +185,12 @@ get_nodes(GtkTextBuffer *buffer)
   n[3].type = CMARK_NODE_CODE_BLOCK;
   n[3].user_data = NULL;
   n[3].create_func = create_code_node;
+
+    n[4].tag = get_tag(buffer, "bold");
+  n[4].type = CMARK_NODE_STRONG;
+  n[4].user_data = NULL;
+  n[4].create_func = create_text_node;
+
 
   return n;
 }

@@ -126,6 +126,29 @@ test_match_code_start(void)
   g_free(res);
 }
 
+void
+test_match_bold_start(void)
+{
+  GtkTextBuffer *content;
+  struct report_anchor ctx = { 0 };
+  gchar *res;
+
+  ctx.link = assert_not_called;
+  ctx.img = assert_not_called;
+
+  content = gtk_text_buffer_new(NULL);
+  markdown_setup_tags(content, NULL);
+
+  markdown_to_text_buffer("Random text\n**This is some bold text**", content, &ctx);
+
+  res = markdown_from_text_buffer(content);
+
+  g_assert_cmpstr("**This is some bold text**", ==, res);
+
+  g_clear_object(&content);
+  g_free(res);
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -139,6 +162,10 @@ main(int argc, char *argv[])
   g_test_add_func("/markdown/print/h3/start", test_match_h3_start);
 
   g_test_add_func("/markdown/print/code/start", test_match_code_start);
+
+  g_test_add_func("/markdown/print/bold/start", test_match_bold_start);
+
+
 
   return g_test_run();
 }
